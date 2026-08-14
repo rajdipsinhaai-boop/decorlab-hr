@@ -64,9 +64,11 @@ function AuthPage() {
     <main className="flex min-h-screen items-center justify-center px-4 py-12">
       <div className="panel w-full max-w-sm p-7">
         <div className="mb-6 text-center">
-          <span className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-primary/40 bg-secondary">
-            <Lock className="h-4 w-4 text-primary" />
-          </span>
+          <img
+            src={decorlabLogo}
+            alt="Decorlab logo"
+            className="mx-auto mb-3 h-16 w-16 rounded-2xl border border-primary/30 bg-secondary object-contain p-2"
+          />
           <h1 className="text-xl font-semibold tracking-tight">
             Decor<span className="text-gold-gradient">lab</span> HR
           </h1>

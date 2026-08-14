@@ -72,14 +72,21 @@ function DashboardPage() {
   return (
     <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8">
       <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.3em] text-primary">Decorlab</p>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-            HR Performance <span className="text-gold-gradient">Dashboard</span>
-          </h1>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Review period: {data?.month ?? "—"} · live from the HR spreadsheet
-          </p>
+        <div className="flex items-center gap-3 sm:gap-4">
+          <img
+            src={decorlabLogo}
+            alt="Decorlab logo"
+            className="h-12 w-12 shrink-0 rounded-xl border border-primary/30 bg-secondary object-contain p-1.5 sm:h-14 sm:w-14"
+          />
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.3em] text-primary">Decorlab</p>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              HR Performance <span className="text-gold-gradient">Dashboard</span>
+            </h1>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Review period: {data?.month ?? "—"} · live from the HR spreadsheet
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="icon" onClick={() => refetch()} aria-label="Refresh data">
