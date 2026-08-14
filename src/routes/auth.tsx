@@ -68,7 +68,7 @@ function AuthPage() {
           <img
             src={decorlabLogo}
             alt="Decorlab logo"
-            className="mx-auto mb-3 h-16 w-16 rounded-2xl border border-primary/30 bg-secondary object-contain p-2"
+            className="mx-auto mb-3 h-24 w-24 object-contain sm:h-28 sm:w-28"
           />
           <h1 className="text-xl font-semibold tracking-tight">
             Decor<span className="text-gold-gradient">lab</span> HR
