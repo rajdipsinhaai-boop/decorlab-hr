@@ -105,9 +105,8 @@ export function EmployeeDetail({
                 <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   Rated criteria (1-5)
                 </h4>
-                <div className="h-64 w-full">
+                 <div className="h-72 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    {employee.roleGroup === "designer" ? (
                       <RadarChart data={employee.criteria} outerRadius="72%">
                         <PolarGrid stroke="var(--border)" />
                         <PolarAngleAxis
@@ -130,33 +129,6 @@ export function EmployeeDetail({
                           }}
                         />
                       </RadarChart>
-                    ) : (
-                      <BarChart data={employee.criteria} layout="vertical" margin={{ left: 8, right: 16 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                        <XAxis
-                          type="number"
-                          domain={[0, 5]}
-                          tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
-                        />
-                        <YAxis
-                          type="category"
-                          dataKey="name"
-                          width={150}
-                          tick={{ fill: "var(--muted-foreground)", fontSize: 9 }}
-                        />
-                        <Tooltip
-                          cursor={{ fill: "var(--accent)" }}
-                          contentStyle={{
-                            background: "var(--popover)",
-                            border: "1px solid var(--border)",
-                            borderRadius: 10,
-                            color: "var(--popover-foreground)",
-                            fontSize: 12,
-                          }}
-                        />
-                        <Bar dataKey="rating" fill="var(--primary)" radius={[0, 6, 6, 0]} />
-                      </BarChart>
-                    )}
                   </ResponsiveContainer>
                 </div>
               </section>
