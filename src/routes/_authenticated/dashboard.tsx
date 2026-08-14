@@ -14,6 +14,9 @@ import { EmployeeDetail } from "@/components/dashboard/EmployeeDetail";
 import { AttendanceSection } from "@/components/dashboard/AttendanceSection";
 import { TrendSection } from "@/components/dashboard/TrendSection";
 import { CreateReportButton } from "@/components/dashboard/CreateReportButton";
+import { UploadAttendanceCard } from "@/components/dashboard/UploadAttendanceCard";
+import { UploadWhatsAppCard } from "@/components/dashboard/UploadWhatsAppCard";
+import { AskTeamChat } from "@/components/dashboard/AskTeamChat";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -118,6 +121,11 @@ function DashboardPage() {
         <div className="space-y-8">
           <SummaryStrip employees={data.employees} />
 
+          <section className="grid gap-4 lg:grid-cols-2">
+            <UploadAttendanceCard months={data.months} />
+            <UploadWhatsAppCard months={data.months} />
+          </section>
+
           <section>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -179,6 +187,8 @@ function DashboardPage() {
         month={data?.month ?? ""}
         onOpenChange={(open) => !open && setSelected(null)}
       />
+
+      <AskTeamChat />
     </main>
   );
 }

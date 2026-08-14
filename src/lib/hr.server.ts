@@ -286,11 +286,18 @@ export async function loadDashboard(): Promise<DashboardData> {
 }
 
 export async function loadControlRows(): Promise<ControlRow[]> {
-  const range = "Control!A3:G500";
+  const range = "Control!A3:H500";
   const grid = (await batchGet([range]))[range] ?? [];
   return grid.slice(1).flatMap((row) => {
     const requestId = cell(row, 0);
     if (!requestId) return [];
+    const rawType = cell(row, 7);
+    const type =
+      rawType.toLowerCase().includes("attendance")
+        ? "Attendance Upload"
+        : rawType.toLowerCase().includes("whatsapp")
+          ? "WhatsApp Export"
+          : "Create Report";
     return [
       {
         requestId,
@@ -300,6 +307,7 @@ export async function loadControlRows(): Promise<ControlRow[]> {
         status: cell(row, 4).toUpperCase(),
         driveLink: cell(row, 5),
         completedAt: cell(row, 6),
+        type: type as ControlRow["type"],
       },
     ];
   });
