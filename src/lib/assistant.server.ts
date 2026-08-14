@@ -1,7 +1,11 @@
-/** Server-only, read-only HR assistant backed by Anthropic. */
+/** Server-only, read-only HR assistant backed by Lovable AI Gateway. */
+import { generateText } from "ai";
 import { loadDashboard } from "./hr.server";
+import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 
-const MODEL = "claude-sonnet-4-5";
+// Cost-efficient, current-generation model on the Lovable AI Gateway.
+// Swap to "google/gemini-3.1-flash-lite" if you want the cheapest option.
+const MODEL = "google/gemini-3.6-flash";
 
 function compactContext(data: Awaited<ReturnType<typeof loadDashboard>>) {
   return {
@@ -33,8 +37,8 @@ export async function answerQuestion(
   question: string,
   history: { role: string; content: string }[],
 ): Promise<string> {
-  const apiKey = process.env["ANTHROPIC_API_KEY"];
-  if (!apiKey) throw new Error("The assistant is not configured yet (missing API key).");
+  const apiKey = process.env["LOVABLE_API_KEY"];
+  if (!apiKey) throw new Error("The assistant is not configured yet (missing LOVABLE_API_KEY).");
 
   const data = await loadDashboard();
   const system = [
@@ -48,30 +52,22 @@ export async function answerQuestion(
   const messages = [
     ...history
       .filter((m) => m.role === "user" || m.role === "assistant")
-      .map((m) => ({ role: m.role, content: m.content })),
-    { role: "user", content: question },
+      .map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+    { role: "user" as const, content: question },
   ];
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({ model: MODEL, max_tokens: 900, system, messages }),
-  });
+  const gateway = createLovableAiGatewayProvider(apiKey);
 
-  if (!res.ok) {
-    const body = await res.text();
-    console.error(`Anthropic request failed [${res.status}]: ${body}`);
-    throw new Error(`The assistant could not answer right now [${res.status}]`);
+  try {
+    const result = await generateText({
+      model: gateway(MODEL),
+      system,
+      messages,
+      temperature: 0.3,
+    });
+    return result.text.trim() || "I couldn't produce an answer for that.";
+  } catch (error) {
+    console.error("Lovable AI Gateway assistant error:", error);
+    throw new Error("The assistant could not answer right now. Please try again in a moment.");
   }
-  const json = (await res.json()) as { content?: { type: string; text?: string }[] };
-  const text = (json.content ?? [])
-    .filter((c) => c.type === "text")
-    .map((c) => c.text ?? "")
-    .join("\n")
-    .trim();
-  return text || "I couldn't produce an answer for that.";
 }
