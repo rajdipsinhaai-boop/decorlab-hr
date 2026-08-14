@@ -1,15 +1,10 @@
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
   PolarAngleAxis,
   PolarGrid,
   Radar,
   RadarChart,
   ResponsiveContainer,
   Tooltip,
-  XAxis,
-  YAxis,
 } from "recharts";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScoreRing } from "./ScoreRing";
