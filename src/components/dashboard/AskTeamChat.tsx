@@ -98,8 +98,19 @@ export function AskTeamChat() {
                   </div>
                 </div>
               ) : (
-                <div key={i} className="max-w-[95%] whitespace-pre-wrap leading-relaxed text-foreground">
-                  {m.content}
+                <div
+                  key={i}
+                  className="max-w-[95%] space-y-2 leading-relaxed text-foreground [&_a]:text-primary [&_a]:underline [&_li]:ml-4 [&_li]:list-disc [&_ol_li]:list-decimal [&_strong]:font-semibold [&_strong]:text-primary"
+                >
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                      ul: ({ children }) => <ul className="mb-2 space-y-1 last:mb-0">{children}</ul>,
+                      ol: ({ children }) => <ol className="mb-2 space-y-1 last:mb-0">{children}</ol>,
+                    }}
+                  >
+                    {m.content}
+                  </ReactMarkdown>
                 </div>
               ),
             )}
