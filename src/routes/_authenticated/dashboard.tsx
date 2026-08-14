@@ -17,6 +17,7 @@ import { CreateReportButton } from "@/components/dashboard/CreateReportButton";
 import { UploadAttendanceCard } from "@/components/dashboard/UploadAttendanceCard";
 import { UploadWhatsAppCard } from "@/components/dashboard/UploadWhatsAppCard";
 import { AskTeamChat } from "@/components/dashboard/AskTeamChat";
+import decorlabLogo from "@/assets/decorlab-logo.png";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
