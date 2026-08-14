@@ -63,7 +63,12 @@ export interface ControlRow {
   status: string;
   driveLink: string;
   completedAt: string;
+  type: RequestType;
 }
+
+export type RequestType = "Create Report" | "Attendance Upload" | "WhatsApp Export";
+
+export type WhatsAppGroup = "Decorlab Designers Group" | "Decorlab Supervisors Group";
 
 export function ragOf(score: number): Rag {
   if (score >= 75) return "GREEN";
