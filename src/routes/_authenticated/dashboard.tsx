@@ -77,7 +77,7 @@ function DashboardPage() {
           <img
             src={decorlabLogo}
             alt="Decorlab logo"
-            className="h-12 w-12 shrink-0 rounded-xl border border-primary/30 bg-secondary object-contain p-1.5 sm:h-14 sm:w-14"
+            className="h-16 w-16 shrink-0 object-contain sm:h-20 sm:w-20"
           />
           <div>
             <p className="text-[11px] uppercase tracking-[0.3em] text-primary">Decorlab</p>
