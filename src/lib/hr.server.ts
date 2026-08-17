@@ -169,7 +169,7 @@ export async function loadDashboard(): Promise<DashboardData> {
   const designer = parseKraTab(data[ranges[4]!] ?? []);
   const ea = parseKraTab(data[ranges[5]!] ?? []);
   const attendance = data[ranges[6]!] ?? [];
-  const activity = await loadActivityLogs();
+  const activity = await loadActivityLogs(month);
 
   // Employee master
   const mHeaders = master[0] ?? [];
