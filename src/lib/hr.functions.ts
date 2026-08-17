@@ -67,7 +67,7 @@ export const createReportRequest = createServerFn({ method: "POST" })
     return { month: input.month };
   })
   .handler(async ({ data, context }): Promise<{ requestId: string }> => {
-    const email = await assertAllowed(context as never);
+    const email = await assertLeadership(context as never);
     const { appendRow } = await import("./sheets.server");
     const requestId = crypto.randomUUID();
     await appendRow(CONTROL_RANGE, [
@@ -90,7 +90,7 @@ export const getReportStatus = createServerFn({ method: "POST" })
     return { requestId: input.requestId };
   })
   .handler(async ({ data, context }): Promise<ControlRow | null> => {
-    await assertAllowed(context as never);
+    await assertLeadership(context as never);
     const { loadControlRows } = await import("./hr.server");
     const rows = await loadControlRows();
     return rows.find((r) => r.requestId === data.requestId) ?? null;
@@ -119,7 +119,7 @@ export const uploadAttendance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: UploadInput) => validateUpload(input, ".pdf"))
   .handler(async ({ data, context }): Promise<{ requestId: string; driveLink: string }> => {
-    const email = await assertAllowed(context as never);
+    const { email } = await assertAllowed(context as never);
     const { findOrCreateFolder, uploadFile } = await import("./drive.server");
     const { appendRow } = await import("./sheets.server");
 
@@ -156,7 +156,7 @@ export const uploadWhatsAppExport = createServerFn({ method: "POST" })
     return { ...valid, group };
   })
   .handler(async ({ data, context }): Promise<{ requestId: string; driveLink: string }> => {
-    const email = await assertAllowed(context as never);
+    const { email } = await assertAllowed(context as never);
     const { findOrCreateFolder, uploadFile } = await import("./drive.server");
     const { appendRow } = await import("./sheets.server");
 
@@ -211,7 +211,7 @@ export const askAssistant = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data, context }): Promise<{ answer: string }> => {
-    await assertAllowed(context as never);
+    await assertLeadership(context as never);
     const { answerQuestion } = await import("./assistant.server");
     return { answer: await answerQuestion(data.question, data.history) };
   });
