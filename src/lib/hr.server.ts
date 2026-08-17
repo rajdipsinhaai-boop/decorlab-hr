@@ -150,6 +150,93 @@ function reviewMonth(grid: Grid): string {
   return cell(row, 1) || "";
 }
 
+interface ActivityBundle {
+  dpr: Record<string, DprActivityEntry[]>;
+  task: Record<string, TaskActivityEntry[]>;
+  filing: Record<string, number>;
+}
+
+/** Activity Log tabs are optional — a missing tab must not break the dashboard. */
+async function loadActivityLogs(month: string): Promise<ActivityBundle> {
+  const out: ActivityBundle = { dpr: {}, task: {}, filing: {} };
+  const dprRange = "DPR Activity Log!A1:H3000";
+  const taskRange = "Task Activity Log!A1:H3000";
+
+  const read = async (range: string): Promise<Grid> => {
+    try {
+      return (await batchGet([range]))[range] ?? [];
+    } catch {
+      return [];
+    }
+  };
+
+  const [dprGrid, taskGrid] = await Promise.all([read(dprRange), read(taskRange)]);
+
+  const inMonth = (row: string[], monthCol: number) => {
+    const m = cell(row, monthCol);
+    return !month || !m || m.toLowerCase() === month.toLowerCase();
+  };
+
+  if (dprGrid.length > 1) {
+    const map = headerIndex(dprGrid[0] ?? []);
+    const i = {
+      name: find(map, "employee name"),
+      date: find(map, "date"),
+      grade: find(map, "grade"),
+      summary: find(map, "work summary"),
+      blockers: find(map, "blockers"),
+      plan: find(map, "tomorrow"),
+      month: find(map, "month"),
+    };
+    for (const row of dprGrid.slice(1)) {
+      const name = cell(row, i.name);
+      if (!name || !inMonth(row, i.month)) continue;
+      const summary = cell(row, i.summary);
+      const isSummary = /^summary$/i.test(cell(row, i.date)) || /^summary/i.test(cell(row, i.grade));
+      if (isSummary) {
+        const pct = /(\d+(\.\d+)?)\s*%?/.exec(`${summary} ${cell(row, i.blockers)}`.trim());
+        if (pct) out.filing[name] = Math.round(parseFloat(pct[1]!));
+        continue;
+      }
+      (out.dpr[name] ??= []).push({
+        date: cell(row, i.date),
+        grade: cell(row, i.grade),
+        summary,
+        blockers: cell(row, i.blockers),
+        plan: cell(row, i.plan),
+      });
+    }
+  }
+
+  if (taskGrid.length > 1) {
+    const map = headerIndex(taskGrid[0] ?? []);
+    const i = {
+      name: find(map, "employee name"),
+      task: find(map, "task name"),
+      status: find(map, "status"),
+      assigned: find(map, "assigned date"),
+      done: find(map, "done date"),
+      revisions: find(map, "revision"),
+      notes: find(map, "notes"),
+      month: find(map, "month"),
+    };
+    for (const row of taskGrid.slice(1)) {
+      const name = cell(row, i.name);
+      if (!name || !inMonth(row, i.month)) continue;
+      (out.task[name] ??= []).push({
+        task: cell(row, i.task),
+        status: cell(row, i.status),
+        assignedDate: cell(row, i.assigned),
+        doneDate: cell(row, i.done),
+        revisions: cell(row, i.revisions),
+        notes: cell(row, i.notes),
+      });
+    }
+  }
+
+  return out;
+}
+
 export async function loadDashboard(): Promise<DashboardData> {
   const ranges = [
     "Monthly Summary!B2:B2",
