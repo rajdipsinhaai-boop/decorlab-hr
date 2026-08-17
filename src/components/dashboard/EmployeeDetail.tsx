@@ -9,6 +9,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScoreRing } from "./ScoreRing";
 import { AttendanceHeatmap } from "./AttendanceHeatmap";
+import { ActivitySection } from "./ActivitySection";
 import { initialsOf, ragLabel, type Employee } from "@/lib/hr-types";
 
 const SEGMENT_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-4)"];
@@ -135,6 +136,8 @@ export function EmployeeDetail({
               </h4>
               <AttendanceHeatmap days={employee.days} />
             </section>
+
+            <ActivitySection employee={employee} month={month} />
           </>
         ) : null}
       </DialogContent>
