@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { ControlRow, DashboardData } from "./hr-types";
+import type { ControlRow, DashboardView, ViewerRole } from "./hr-types";
 
 const CONTROL_RANGE = "Control!A:H";
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -10,25 +10,52 @@ function utcStamp() {
   return new Date().toISOString().replace("T", " ").slice(0, 19);
 }
 
-async function assertAllowed(context: { supabase: any; claims: any }): Promise<string> {
+async function assertAllowed(context: {
+  supabase: any;
+  claims: any;
+}): Promise<{ email: string; role: ViewerRole }> {
   const email = (context.claims?.email ?? "").toString().toLowerCase();
   if (!email) throw new Error("No email on this account.");
   const { data, error } = await context.supabase
     .from("allowed_emails")
-    .select("email")
+    .select("email, role")
     .ilike("email", email)
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Your account is not on the Decorlab HR access list.");
+  return { email, role: (data.role as ViewerRole) ?? "leadership" };
+}
+
+/** Leadership-only surfaces (scores, reports, AI assistant). */
+async function assertLeadership(context: { supabase: any; claims: any }): Promise<string> {
+  const { email, role } = await assertAllowed(context);
+  if (role !== "leadership") {
+    throw new Error("Your account does not have access to performance scores.");
+  }
   return email;
 }
 
 export const getDashboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<DashboardData> => {
-    await assertAllowed(context as never);
+  .handler(async ({ context }): Promise<DashboardView> => {
+    const { role } = await assertAllowed(context as never);
     const { loadDashboard } = await import("./hr.server");
-    return loadDashboard();
+    const data = await loadDashboard();
+    if (role === "manager") {
+      // Managers only ever receive names and roles — no scores leave the server.
+      return {
+        viewerRole: "manager",
+        month: data.month,
+        months: data.months,
+        roster: data.employees.map((e) => ({
+          id: e.id,
+          name: e.name,
+          role: e.role,
+          roleGroup: e.roleGroup,
+        })),
+      };
+    }
+    return { viewerRole: "leadership", data };
   });
 
 export const createReportRequest = createServerFn({ method: "POST" })
@@ -40,7 +67,7 @@ export const createReportRequest = createServerFn({ method: "POST" })
     return { month: input.month };
   })
   .handler(async ({ data, context }): Promise<{ requestId: string }> => {
-    const email = await assertAllowed(context as never);
+    const email = await assertLeadership(context as never);
     const { appendRow } = await import("./sheets.server");
     const requestId = crypto.randomUUID();
     await appendRow(CONTROL_RANGE, [
@@ -92,7 +119,7 @@ export const uploadAttendance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: UploadInput) => validateUpload(input, ".pdf"))
   .handler(async ({ data, context }): Promise<{ requestId: string; driveLink: string }> => {
-    const email = await assertAllowed(context as never);
+    const { email } = await assertAllowed(context as never);
     const { findOrCreateFolder, uploadFile } = await import("./drive.server");
     const { appendRow } = await import("./sheets.server");
 
@@ -129,7 +156,7 @@ export const uploadWhatsAppExport = createServerFn({ method: "POST" })
     return { ...valid, group };
   })
   .handler(async ({ data, context }): Promise<{ requestId: string; driveLink: string }> => {
-    const email = await assertAllowed(context as never);
+    const { email } = await assertAllowed(context as never);
     const { findOrCreateFolder, uploadFile } = await import("./drive.server");
     const { appendRow } = await import("./sheets.server");
 
@@ -184,7 +211,7 @@ export const askAssistant = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data, context }): Promise<{ answer: string }> => {
-    await assertAllowed(context as never);
+    await assertLeadership(context as never);
     const { answerQuestion } = await import("./assistant.server");
     return { answer: await answerQuestion(data.question, data.history) };
   });

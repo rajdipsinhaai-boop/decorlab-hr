@@ -19,16 +19,19 @@ export type Database = {
           created_at: string
           email: string
           id: string
+          role: Database["public"]["Enums"]["access_role"]
         }
         Insert: {
           created_at?: string
           email: string
           id?: string
+          role?: Database["public"]["Enums"]["access_role"]
         }
         Update: {
           created_at?: string
           email?: string
           id?: string
+          role?: Database["public"]["Enums"]["access_role"]
         }
         Relationships: []
       }
@@ -40,7 +43,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      access_role: "leadership" | "manager"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -167,6 +170,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      access_role: ["leadership", "manager"],
+    },
   },
 } as const
