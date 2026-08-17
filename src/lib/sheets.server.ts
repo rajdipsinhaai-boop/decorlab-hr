@@ -127,3 +127,16 @@ export async function appendRows(range: string, rows: (string | number)[][]) {
     },
   );
 }
+
+/** Read-only helpers for OTHER spreadsheets (e.g. the site follow-up sheets). */
+export async function getTitlesOf(spreadsheetId: string): Promise<string[]> {
+  const json = await sheetsFetch(
+    `/spreadsheets/${spreadsheetId}?fields=${encodeURIComponent("sheets.properties.title")}`,
+  );
+  return (json.sheets ?? []).map((s: any) => s.properties?.title as string).filter(Boolean);
+}
+
+export async function getValuesOf(spreadsheetId: string, range: string): Promise<Grid> {
+  const json = await sheetsFetch(`/spreadsheets/${spreadsheetId}/values/${range}`);
+  return (json.values ?? []) as Grid;
+}
