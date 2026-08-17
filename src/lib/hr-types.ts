@@ -75,6 +75,19 @@ export interface DashboardData {
   employees: Employee[];
 }
 
+export type ViewerRole = "leadership" | "manager";
+
+export interface RosterEntry {
+  id: string;
+  name: string;
+  role: string;
+  roleGroup: RoleGroup;
+}
+
+export type DashboardView =
+  | { viewerRole: "leadership"; data: DashboardData }
+  | { viewerRole: "manager"; month: string; months: string[]; roster: RosterEntry[] };
+
 export interface ControlRow {
   requestId: string;
   requestedAt: string;
