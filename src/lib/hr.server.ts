@@ -6,9 +6,11 @@ import {
   type ControlRow,
   type CriterionRating,
   type DashboardData,
+  type DprActivityEntry,
   type Employee,
   type Rag,
   type RoleGroup,
+  type TaskActivityEntry,
 } from "./hr-types";
 
 const TARGET_HOURS = 9;
@@ -167,6 +169,7 @@ export async function loadDashboard(): Promise<DashboardData> {
   const designer = parseKraTab(data[ranges[4]!] ?? []);
   const ea = parseKraTab(data[ranges[5]!] ?? []);
   const attendance = data[ranges[6]!] ?? [];
+  const activity = await loadActivityLogs();
 
   // Employee master
   const mHeaders = master[0] ?? [];
@@ -271,6 +274,9 @@ export async function loadDashboard(): Promise<DashboardData> {
         ? Math.round(deviations.reduce((a, b) => a + b, 0) / deviations.length)
         : 0,
       days,
+      filingDiscipline: activity.filing[name] ?? null,
+      dprActivity: activity.dpr[name] ?? [],
+      taskActivity: activity.task[name] ?? [],
     });
   }
 
