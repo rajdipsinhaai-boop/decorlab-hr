@@ -24,6 +24,23 @@ export interface AttendanceDay {
   hours: number;
 }
 
+export interface DprActivityEntry {
+  date: string;
+  grade: string;
+  summary: string;
+  blockers: string;
+  plan: string;
+}
+
+export interface TaskActivityEntry {
+  task: string;
+  status: string;
+  assignedDate: string;
+  doneDate: string;
+  revisions: string;
+  notes: string;
+}
+
 export interface Employee {
   id: string;
   name: string;
@@ -45,6 +62,9 @@ export interface Employee {
   avgHours: number;
   punctualityDeviation: number;
   days: AttendanceDay[];
+  filingDiscipline: number | null;
+  dprActivity: DprActivityEntry[];
+  taskActivity: TaskActivityEntry[];
 }
 
 export interface DashboardData {
