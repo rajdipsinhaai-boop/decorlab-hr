@@ -90,7 +90,7 @@ export const getReportStatus = createServerFn({ method: "POST" })
     return { requestId: input.requestId };
   })
   .handler(async ({ data, context }): Promise<ControlRow | null> => {
-    await assertLeadership(context as never);
+    await assertAllowed(context as never);
     const { loadControlRows } = await import("./hr.server");
     const rows = await loadControlRows();
     return rows.find((r) => r.requestId === data.requestId) ?? null;
