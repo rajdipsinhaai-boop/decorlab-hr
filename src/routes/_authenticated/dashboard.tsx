@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getDashboard } from "@/lib/hr.functions";
-import type { Employee } from "@/lib/hr-types";
+import { initialsOf, type DashboardData, type Employee, type RosterEntry } from "@/lib/hr-types";
 import { SummaryStrip } from "@/components/dashboard/SummaryStrip";
 import { EmployeeCard } from "@/components/dashboard/EmployeeCard";
 import { EmployeeDetail } from "@/components/dashboard/EmployeeDetail";
@@ -46,29 +46,20 @@ const ROLE_ORDER = ["supervisor", "designer", "ea"] as const;
 function DashboardPage() {
   const navigate = useNavigate();
   const fetchDashboard = useServerFn(getDashboard);
-  const [selected, setSelected] = useState<Employee | null>(null);
-  const [filter, setFilter] = useState<"ALL" | "RED" | "YELLOW" | "GREEN">("ALL");
 
-  const { data, isLoading, error, refetch, isFetching } = useQuery({
+  const { data: view, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ["hr-dashboard"],
     queryFn: () => fetchDashboard(),
     staleTime: 60_000,
   });
 
-  const employees = useMemo(() => {
-    const list = data?.employees ?? [];
-    return [...list]
-      .filter((e) => filter === "ALL" || e.rag === filter)
-      .sort(
-        (a, b) =>
-          ROLE_ORDER.indexOf(a.roleGroup) - ROLE_ORDER.indexOf(b.roleGroup) || b.score - a.score,
-      );
-  }, [data, filter]);
-
   const signOut = async () => {
     await supabase.auth.signOut();
     navigate({ to: "/auth" });
   };
+
+  const isManager = view?.viewerRole === "manager";
+  const month = view ? (view.viewerRole === "manager" ? view.month : view.data.month) : "—";
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8">
@@ -82,10 +73,14 @@ function DashboardPage() {
           <div>
             <p className="text-[11px] uppercase tracking-[0.3em] text-primary">Decorlab</p>
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              HR Performance <span className="text-gold-gradient">Dashboard</span>
+              {isManager ? (
+                <>Team <span className="text-gold-gradient">Uploads</span></>
+              ) : (
+                <>HR Performance <span className="text-gold-gradient">Dashboard</span></>
+              )}
             </h1>
             <p className="mt-1 text-xs text-muted-foreground">
-              Review period: {data?.month ?? "—"} · live from the HR spreadsheet
+              Review period: {month} · live from the HR spreadsheet
             </p>
           </div>
         </div>
@@ -96,7 +91,7 @@ function DashboardPage() {
           <Button variant="ghost" size="icon" onClick={signOut} aria-label="Sign out">
             <LogOut className="h-4 w-4" />
           </Button>
-          <CreateReportButton month={data?.month ?? ""} />
+          {view?.viewerRole === "leadership" ? <CreateReportButton month={view.data.month} /> : null}
         </div>
       </header>
 
@@ -125,78 +120,158 @@ function DashboardPage() {
             ))}
           </div>
         </div>
-      ) : data ? (
-        <div className="space-y-8">
-          <SummaryStrip employees={data.employees} />
+      ) : view?.viewerRole === "manager" ? (
+        <ManagerView months={view.months} roster={view.roster} />
+      ) : view ? (
+        <LeadershipView data={view.data} />
+      ) : null}
+    </main>
+  );
+}
 
-          <section className="grid gap-4 lg:grid-cols-2">
-            <UploadAttendanceCard months={data.months} />
-            <UploadWhatsAppCard months={data.months} />
-          </section>
+const ROLE_LABEL: Record<string, string> = {
+  supervisor: "Site supervisors",
+  designer: "Interior designers",
+  ea: "Executive assistant",
+};
 
-          <section>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                Team
-              </h2>
-              <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                {(["ALL", "GREEN", "YELLOW", "RED"] as const).map((f) => (
-                  <button
-                    key={f}
-                    type="button"
-                    onClick={() => setFilter(f)}
-                    className={`rounded-full border px-3 py-1 transition-colors ${
-                      filter === f
-                        ? "border-primary bg-primary/15 text-primary"
-                        : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                    }`}
+function ManagerView({ months, roster }: { months: string[]; roster: RosterEntry[] }) {
+  const grouped = useMemo(() => {
+    return ROLE_ORDER.map((group) => ({
+      group,
+      people: roster.filter((r) => r.roleGroup === group),
+    })).filter((g) => g.people.length);
+  }, [roster]);
+
+  return (
+    <div className="space-y-8">
+      <section className="grid gap-4 lg:grid-cols-2">
+        <UploadAttendanceCard months={months} />
+        <UploadWhatsAppCard months={months} />
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          Team
+        </h2>
+        <div className="space-y-5">
+          {grouped.map(({ group, people }) => (
+            <div key={group}>
+              <p className="mb-2 text-xs uppercase tracking-[0.2em] text-primary">
+                {ROLE_LABEL[group] ?? group}
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {people.map((p) => (
+                  <div
+                    key={p.id}
+                    className="panel flex items-center gap-3 p-4 transition-colors hover:border-primary/50"
                   >
-                    {f === "ALL" ? "All" : f === "GREEN" ? "Green ≥75%" : f === "YELLOW" ? "Yellow 60-75%" : "Red <60%"}
-                  </button>
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-secondary text-xs font-semibold text-primary">
+                      {initialsOf(p.name)}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium">{p.name}</span>
+                      <span className="block truncate text-xs text-muted-foreground">{p.role}</span>
+                    </span>
+                  </div>
                 ))}
               </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {employees.map((e) => (
-                <EmployeeCard key={e.id} employee={e} onOpen={() => setSelected(e)} />
+          ))}
+        </div>
+        <p className="mt-4 text-xs text-muted-foreground">
+          Performance scores and review analytics are visible to leadership only.
+        </p>
+      </section>
+    </div>
+  );
+}
+
+function LeadershipView({ data }: { data: DashboardData }) {
+  const [selected, setSelected] = useState<Employee | null>(null);
+  const [filter, setFilter] = useState<"ALL" | "RED" | "YELLOW" | "GREEN">("ALL");
+
+  const employees = useMemo(() => {
+    return [...data.employees]
+      .filter((e) => filter === "ALL" || e.rag === filter)
+      .sort(
+        (a, b) =>
+          ROLE_ORDER.indexOf(a.roleGroup) - ROLE_ORDER.indexOf(b.roleGroup) || b.score - a.score,
+      );
+  }, [data, filter]);
+
+  return (
+    <>
+      <div className="space-y-8">
+        <SummaryStrip employees={data.employees} />
+
+        <section className="grid gap-4 lg:grid-cols-2">
+          <UploadAttendanceCard months={data.months} />
+          <UploadWhatsAppCard months={data.months} />
+        </section>
+
+        <section>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Team
+            </h2>
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+              {(["ALL", "GREEN", "YELLOW", "RED"] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setFilter(f)}
+                  className={`rounded-full border px-3 py-1 transition-colors ${
+                    filter === f
+                      ? "border-primary bg-primary/15 text-primary"
+                      : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                  }`}
+                >
+                  {f === "ALL" ? "All" : f === "GREEN" ? "Green ≥75%" : f === "YELLOW" ? "Yellow 60-75%" : "Red <60%"}
+                </button>
               ))}
             </div>
-            {!employees.length ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">No employees in this bucket.</p>
-            ) : null}
-          </section>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {employees.map((e) => (
+              <EmployeeCard key={e.id} employee={e} onOpen={() => setSelected(e)} />
+            ))}
+          </div>
+          {!employees.length ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">No employees in this bucket.</p>
+          ) : null}
+        </section>
 
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Attendance &amp; punctuality
-            </h2>
-            <AttendanceSection data={data} />
-          </section>
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            Attendance &amp; punctuality
+          </h2>
+          <AttendanceSection data={data} />
+        </section>
 
-          <TrendSection data={data} />
+        <TrendSection data={data} />
 
-          <footer className="panel flex flex-wrap items-center gap-4 p-4 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">RAG legend</span>
-            <span className="flex items-center gap-1.5">
-              <i className="h-2.5 w-2.5 rounded-full bg-danger" /> Red — below 60%
-            </span>
-            <span className="flex items-center gap-1.5">
-              <i className="h-2.5 w-2.5 rounded-full bg-warning" /> Yellow — 60% to 75%
-            </span>
-            <span className="flex items-center gap-1.5">
-              <i className="h-2.5 w-2.5 rounded-full bg-success" /> Green — 75% and above
-            </span>
-          </footer>
-        </div>
-      ) : null}
+        <footer className="panel flex flex-wrap items-center gap-4 p-4 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">RAG legend</span>
+          <span className="flex items-center gap-1.5">
+            <i className="h-2.5 w-2.5 rounded-full bg-danger" /> Red — below 60%
+          </span>
+          <span className="flex items-center gap-1.5">
+            <i className="h-2.5 w-2.5 rounded-full bg-warning" /> Yellow — 60% to 75%
+          </span>
+          <span className="flex items-center gap-1.5">
+            <i className="h-2.5 w-2.5 rounded-full bg-success" /> Green — 75% and above
+          </span>
+        </footer>
+      </div>
 
       <EmployeeDetail
         employee={selected}
-        month={data?.month ?? ""}
+        month={data.month}
         onOpenChange={(open) => !open && setSelected(null)}
       />
 
       <AskTeamChat />
-    </main>
+    </>
   );
 }
