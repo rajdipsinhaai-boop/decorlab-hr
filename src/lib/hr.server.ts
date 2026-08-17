@@ -239,7 +239,7 @@ async function loadActivityLogs(month: string): Promise<ActivityBundle> {
 
 export async function loadDashboard(): Promise<DashboardData> {
   const ranges = [
-    "Monthly Summary!B2:B2",
+    "Monthly Summary!A2:B2",
     "Employee Master!A3:I200",
     "Monthly Summary!A3:H200",
     "Supervisor KRA!A3:Q400",
