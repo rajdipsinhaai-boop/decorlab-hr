@@ -29,6 +29,10 @@ export function AttendanceSection({ data }: { data: DashboardData }) {
     hours: e.avgHours,
   }));
 
+  const filing = data.employees.filter(
+    (e) => e.roleGroup === "supervisor" && e.filingDiscipline !== null,
+  );
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <section className="panel p-4 sm:p-5">
@@ -38,6 +42,25 @@ export function AttendanceSection({ data }: { data: DashboardData }) {
             Average in-time vs. scheduled {data.scheduledStart} (minutes; positive = late)
           </p>
         </header>
+        {filing.length ? (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {filing.map((e) => (
+              <span
+                key={e.id}
+                title={`${e.name}: DPR filing days ÷ present days`}
+                className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${
+                  (e.filingDiscipline ?? 0) >= 90
+                    ? "border-success/30 bg-success/10 text-success"
+                    : (e.filingDiscipline ?? 0) >= 70
+                      ? "border-warning/30 bg-warning/10 text-warning"
+                      : "border-danger/30 bg-danger/10 text-danger"
+                }`}
+              >
+                {e.name.split(" ")[0]} · filing {e.filingDiscipline}%
+              </span>
+            ))}
+          </div>
+        ) : null}
         <div className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={rows} margin={{ top: 8, right: 8, bottom: 8, left: -12 }}>
