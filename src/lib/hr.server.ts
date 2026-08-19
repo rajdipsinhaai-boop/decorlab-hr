@@ -157,6 +157,40 @@ function buildBreakdown(group: RoleGroup, rec: KraRecord | undefined): Breakdown
   ];
 }
 
+function reportCardNarrative(
+  snapshot: ReportCardSnapshot | undefined,
+  breakdown: BreakdownSegment[],
+  score: number,
+  rag: Rag,
+  month: string,
+  presentDays: number,
+  absentDays: number,
+): { scoreBuilt: string[]; whyScore: string[]; improveNextMonth: string[] } | null {
+  if (!snapshot) return null;
+  const scoreBuilt = snapshot.scoreBuilt.length
+    ? snapshot.scoreBuilt
+    : [
+        ...breakdown.map((segment) => `${segment.label} (weight ${segment.weight}%) ${segment.score}% → ${segment.contribution} pts.`),
+        `Final score: ${score}% (${rag}) for ${month}.`,
+      ];
+  const whyScore = snapshot.whyScore.length
+    ? snapshot.whyScore
+    : [
+        `This score is calculated from the weighted sections shown above.`,
+        `Attendance record: ${presentDays} present day(s) and ${absentDays} absent day(s).`,
+      ];
+  const improveNextMonth = snapshot.improveNextMonth.length
+    ? snapshot.improveNextMonth
+    : [
+        rag === "RED"
+          ? "Focus first on the lowest weighted section and agree on one measurable corrective action with your manager."
+          : rag === "YELLOW"
+            ? "Choose one weighted section to improve next month and review the target with your manager."
+            : "Maintain the current standard and agree on one stretch improvement for the next review month.",
+      ];
+  return { scoreBuilt, whyScore, improveNextMonth };
+}
+
 function reviewMonth(grid: Grid): string {
   // Row 2 of each tab: ["Review Month:", "July 2026", ...]
   const row = grid[0] ?? [];
@@ -358,6 +392,7 @@ export async function loadDashboard(): Promise<DashboardData> {
     const hoursList = present.map((d) => d.hours).filter((h) => h > 0);
 
     const reportCard = REPORT_CARDS[name.toLowerCase()];
+    const reportNarrative = reportCardNarrative(reportCard, buildBreakdown(group, rec), Math.round(score * 10) / 10, rag, month, present.length, days.filter((d) => /absent/i.test(d.status)).length);
 
     employees.push({
       id: cell(row, mi.id) || name,
@@ -385,12 +420,10 @@ export async function loadDashboard(): Promise<DashboardData> {
       filingDiscipline: activity.filing[name] ?? null,
       dprActivity: activity.dpr[name] ?? [],
       taskActivity: activity.task[name] ?? [],
-      reportCard: reportCard
+      reportCard: reportCard && reportNarrative
         ? {
             month: reportCard.month,
-            scoreBuilt: reportCard.scoreBuilt,
-            whyScore: reportCard.whyScore,
-            improveNextMonth: reportCard.improveNextMonth,
+            ...reportNarrative,
             downloadPath: `/api/report-card?name=${encodeURIComponent(name)}`,
           }
         : undefined,

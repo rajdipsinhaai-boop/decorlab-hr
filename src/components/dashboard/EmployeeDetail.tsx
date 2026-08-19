@@ -27,6 +27,12 @@ export function EmployeeDetail({
   month: string;
   onOpenChange: (open: boolean) => void;
 }) {
+  const radarData = employee
+    ? employee.criteria.length
+      ? employee.criteria
+      : employee.breakdown.map((segment) => ({ name: segment.label, rating: Math.max(0, Math.min(5, segment.score / 20)) }))
+    : [];
+
   return (
     <Dialog open={Boolean(employee)} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto border-border bg-card">
@@ -126,39 +132,37 @@ export function EmployeeDetail({
               </section>
             ) : null}
 
-            {employee.criteria.length ? (
-              <section className="space-y-2">
-                <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Rated criteria (1-5)
-                </h4>
-                <div className="h-72 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart data={employee.criteria} outerRadius="72%">
-                      <PolarGrid stroke="var(--border)" />
-                      <PolarAngleAxis
-                        dataKey="name"
-                        tick={{ fill: "var(--muted-foreground)", fontSize: 9 }}
-                      />
-                      <Radar
-                        dataKey="rating"
-                        stroke="var(--primary)"
-                        fill="var(--primary)"
-                        fillOpacity={0.35}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          background: "var(--popover)",
-                          border: "1px solid var(--border)",
-                          borderRadius: 10,
-                          color: "var(--popover-foreground)",
-                          fontSize: 12,
-                        }}
-                      />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </div>
-              </section>
-            ) : null}
+            <section className="space-y-2">
+              <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                {employee.criteria.length ? "Rated criteria (1-5)" : "Score dimensions (1-5)"}
+              </h4>
+              <div className="h-72 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart data={radarData} outerRadius="72%">
+                    <PolarGrid stroke="var(--border)" />
+                    <PolarAngleAxis
+                      dataKey="name"
+                      tick={{ fill: "var(--muted-foreground)", fontSize: 9 }}
+                    />
+                    <Radar
+                      dataKey="rating"
+                      stroke="var(--primary)"
+                      fill="var(--primary)"
+                      fillOpacity={0.35}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        background: "var(--popover)",
+                        border: "1px solid var(--border)",
+                        borderRadius: 10,
+                        color: "var(--popover-foreground)",
+                        fontSize: 12,
+                      }}
+                    />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
 
             <section className="space-y-2">
               <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
