@@ -24,6 +24,7 @@ export function AdminAccessPanel() {
   const [employeeName, setEmployeeName] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmingEmail, setConfirmingEmail] = useState<string | null>(null);
+  const [confirmEmail, setConfirmEmail] = useState("");
 
   const users = useQuery<AccessUser[]>({
     queryKey: ["access-users"],
@@ -103,6 +104,33 @@ export function AdminAccessPanel() {
           Save access
         </Button>
       </form>
+
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border/70 p-3">
+        <label className="min-w-[260px] flex-1 space-y-1.5 text-xs text-muted-foreground">
+          Force-confirm account email
+          <Input type="email" value={confirmEmail} onChange={(event) => setConfirmEmail(event.target.value)} placeholder="adey020@gmail.com" />
+        </label>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!confirmEmail || confirmingEmail === confirmEmail.toLowerCase()}
+          onClick={async () => {
+            const normalized = confirmEmail.trim().toLowerCase();
+            setConfirmingEmail(normalized);
+            try {
+              await confirmUser({ data: { email: normalized } });
+              toast.success("Account activated", { description: `${normalized} can now sign in.` });
+              setConfirmEmail("");
+            } catch (error) {
+              toast.error("Could not activate account", { description: error instanceof Error ? error.message : "Unknown error" });
+            } finally {
+              setConfirmingEmail(null);
+            }
+          }}
+        >
+          {confirmingEmail === confirmEmail.toLowerCase() ? "Activating…" : "Force-confirm account"}
+        </Button>
+      </div>
 
       {users.isLoading ? <p className="text-xs text-muted-foreground">Loading access list…</p> : null}
       {users.error ? <p className="text-xs text-danger">{users.error instanceof Error ? users.error.message : "Could not load access list."}</p> : null}
