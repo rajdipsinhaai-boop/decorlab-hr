@@ -29,6 +29,7 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [busy, setBusy] = useState(false);
+  const [resendBusy, setResendBusy] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -58,6 +59,28 @@ function AuthPage() {
       toast.error(err instanceof Error ? err.message : "Sign-in failed");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const resendVerification = async () => {
+    const targetEmail = email.trim().toLowerCase();
+    if (!targetEmail) {
+      toast.error("Enter the account email first.");
+      return;
+    }
+    setResendBusy(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: targetEmail,
+        options: { emailRedirectTo: `${window.location.origin}/dashboard` },
+      });
+      if (error) throw error;
+      toast.success("Verification email sent", { description: `Check the inbox for ${targetEmail}.` });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not resend verification email");
+    } finally {
+      setResendBusy(false);
     }
   };
 
@@ -106,6 +129,16 @@ function AuthPage() {
             {mode === "signin" ? "Sign in" : "Create account"}
           </Button>
         </form>
+        {mode === "signin" ? (
+          <button
+            type="button"
+            className="mt-3 w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-primary hover:underline disabled:opacity-50"
+            disabled={resendBusy}
+            onClick={resendVerification}
+          >
+            {resendBusy ? "Sending verification email…" : "Resend verification email"}
+          </button>
+        ) : null}
         <button
           type="button"
           className="mt-4 w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
