@@ -69,17 +69,18 @@ async function createAccessToken() {
   const signature = base64Url(signer.sign(credentials.private_key));
   const assertion = `${unsigned}.${signature}`;
 
-  const response = await fetch(
-    credentials.token_uri ?? "https://oauth2.googleapis.com/token",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-        assertion,
-      }),
-    },
-  );
+  const tokenUri = credentials.token_uri ?? "https://oauth2.googleapis.com/token";
+  const startedAt = Date.now();
+  const response = await fetch(tokenUri, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion,
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  console.info(`Google token request completed in ${Date.now() - startedAt}ms.`);
   if (!response.ok) {
     const body = await response.text();
     console.error(`Google token request failed [${response.status}]: ${body}`);
@@ -109,6 +110,7 @@ export async function googleJson<T>(url: string, init?: RequestInit): Promise<T>
       Authorization: `Bearer ${await googleAccessToken()}`,
       ...(init?.headers ?? {}),
     },
+    signal: init?.signal ?? AbortSignal.timeout(15_000),
   });
   if (!response.ok) {
     const body = await response.text();
@@ -121,6 +123,7 @@ export async function googleJson<T>(url: string, init?: RequestInit): Promise<T>
 export async function googleBytes(url: string): Promise<Uint8Array> {
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${await googleAccessToken()}` },
+    signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) {
     const body = await response.text();
@@ -133,6 +136,7 @@ export async function googleBytes(url: string): Promise<Uint8Array> {
 export async function googleText(url: string): Promise<string> {
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${await googleAccessToken()}` },
+    signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) {
     const body = await response.text();
