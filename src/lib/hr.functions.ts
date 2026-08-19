@@ -190,6 +190,25 @@ export const saveAccessUser = createServerFn({ method: "POST" })
     };
   });
 
+export const forceConfirmUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { email: string }) => {
+    const email = (input?.email ?? "").trim().toLowerCase();
+    if (!email || !email.includes("@") || email.length > 200) throw new Error("Enter a valid email.");
+    return { email };
+  })
+  .handler(async ({ data, context }): Promise<{ email: string; confirmed: boolean }> => {
+    await assertAdmin(context as never);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    if (listError) throw new Error(listError.message);
+    const user = users.users.find((candidate) => candidate.email?.toLowerCase() === data.email);
+    if (!user) throw new Error("No account exists for this email yet.");
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, { email_confirm: true });
+    if (error) throw new Error(error.message);
+    return { email: data.email, confirmed: true };
+  });
+
 export const createReportRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { month: string }) => {
