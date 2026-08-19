@@ -16,6 +16,7 @@ import { CreateReportButton } from "@/components/dashboard/CreateReportButton";
 import { UploadAttendanceCard } from "@/components/dashboard/UploadAttendanceCard";
 import { UploadWhatsAppCard } from "@/components/dashboard/UploadWhatsAppCard";
 import { AskTeamChat } from "@/components/dashboard/AskTeamChat";
+import { AdminAccessPanel } from "@/components/dashboard/AdminAccessPanel";
 import decorlabLogo from "@/assets/decorlab-logo.png";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -68,7 +69,12 @@ function DashboardPage() {
   };
 
   const isManager = view?.viewerRole === "manager";
-  const month = view ? (view.viewerRole === "manager" ? view.month : view.data.month) : "—";
+  const isEmployee = view?.viewerRole === "employee";
+  const month = view
+    ? view.viewerRole === "admin"
+      ? view.data.month
+      : view.month
+    : "—";
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8">
@@ -83,7 +89,9 @@ function DashboardPage() {
             <p className="text-[11px] uppercase tracking-[0.3em] text-primary">Decorlab</p>
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
               {isManager ? (
-                <>Team <span className="text-gold-gradient">Uploads</span></>
+                <>Manager <span className="text-gold-gradient">View</span></>
+              ) : isEmployee ? (
+                <>My <span className="text-gold-gradient">Report Card</span></>
               ) : (
                 <>HR Performance <span className="text-gold-gradient">Dashboard</span></>
               )}
@@ -100,7 +108,7 @@ function DashboardPage() {
           <Button variant="ghost" size="icon" onClick={signOut} aria-label="Sign out">
             <LogOut className="h-4 w-4" />
           </Button>
-          {view?.viewerRole === "leadership" ? <CreateReportButton month={view.data.month} /> : null}
+          {view?.viewerRole === "admin" ? <CreateReportButton month={view.data.month} /> : null}
         </div>
       </header>
 
@@ -116,6 +124,8 @@ function DashboardPage() {
         </div>
       ) : null}
 
+      {view?.viewerRole === "admin" ? <AdminAccessPanel /> : null}
+
       {isLoading ? (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
@@ -130,7 +140,9 @@ function DashboardPage() {
           </div>
         </div>
       ) : view?.viewerRole === "manager" ? (
-        <ManagerView months={view.months} roster={view.roster} />
+        <ManagerView month={view.month} months={view.months} roster={view.roster} own={view.own} />
+      ) : view?.viewerRole === "employee" ? (
+        <EmployeeSelfView month={view.month} employee={view.employee} />
       ) : view ? (
         <LeadershipView data={view.data} />
       ) : null}
@@ -144,7 +156,7 @@ const ROLE_LABEL: Record<string, string> = {
   ea: "Executive assistant",
 };
 
-function ManagerView({ months, roster }: { months: string[]; roster: RosterEntry[] }) {
+function ManagerView({ month, months, roster, own }: { month: string; months: string[]; roster: RosterEntry[]; own: Employee | null }) {
   const grouped = useMemo(() => {
     return ROLE_ORDER.map((group) => ({
       group,
@@ -154,10 +166,13 @@ function ManagerView({ months, roster }: { months: string[]; roster: RosterEntry
 
   return (
     <div className="space-y-8">
-      <section className="grid gap-4 lg:grid-cols-2">
-        <UploadAttendanceCard months={months} />
-        <UploadWhatsAppCard months={months} />
-      </section>
+      {own ? (
+        <section className="panel space-y-3 p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">My report card</h2>
+          <p className="text-xs text-muted-foreground">Your manager account can see the whole team roster and your own performance details.</p>
+          <ManagerSelfCard employee={own} month={month} />
+        </section>
+      ) : null}
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -189,10 +204,43 @@ function ManagerView({ months, roster }: { months: string[]; roster: RosterEntry
           ))}
         </div>
         <p className="mt-4 text-xs text-muted-foreground">
-          Performance scores and review analytics are visible to leadership only.
+          Team names and roles are visible to managers. Performance scores are limited to each manager’s own report card and administrators.
         </p>
       </section>
     </div>
+  );
+}
+
+function ManagerSelfCard({ employee, month }: { employee: Employee; month: string }) {
+  const [selected, setSelected] = useState<Employee | null>(null);
+  return (
+    <>
+      <EmployeeCard employee={employee} onOpen={() => setSelected(employee)} />
+      <EmployeeDetail employee={selected} month={month} onOpenChange={(open) => !open && setSelected(null)} />
+    </>
+  );
+}
+
+function EmployeeSelfView({ employee, month }: { employee: Employee | null; month: string }) {
+  const [selected, setSelected] = useState<Employee | null>(employee);
+  if (!employee) {
+    return (
+      <div className="panel p-6 text-sm">
+        Your account is approved, but it is not linked to an Employee Master record yet. Ask an administrator to add your Employee ID or exact name.
+      </div>
+    );
+  }
+  return (
+    <section className="space-y-4">
+      <div>
+        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Personal report card</h2>
+        <p className="mt-1 text-xs text-muted-foreground">Only your own performance, attendance, and report-card details are shown.</p>
+      </div>
+      <div className="max-w-md">
+        <EmployeeCard employee={employee} onOpen={() => setSelected(employee)} />
+      </div>
+      <EmployeeDetail employee={selected} month={month} onOpenChange={(open) => !open && setSelected(null)} />
+    </section>
   );
 }
 

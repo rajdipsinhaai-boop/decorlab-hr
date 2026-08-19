@@ -20,18 +20,24 @@ export type Database = {
           email: string
           id: string
           role: Database["public"]["Enums"]["access_role"]
+          employee_id: string | null
+          employee_name: string | null
         }
         Insert: {
           created_at?: string
           email: string
           id?: string
           role?: Database["public"]["Enums"]["access_role"]
+          employee_id?: string | null
+          employee_name?: string | null
         }
         Update: {
           created_at?: string
           email?: string
           id?: string
           role?: Database["public"]["Enums"]["access_role"]
+          employee_id?: string | null
+          employee_name?: string | null
         }
         Relationships: []
       }
@@ -43,7 +49,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      access_role: "leadership" | "manager"
+      access_role: "admin" | "manager" | "employee" | "leadership"
     }
     CompositeTypes: {
       [_ in never]: never
