@@ -1,12 +1,11 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { AlertTriangle, LogOut, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getDashboard } from "@/lib/hr.functions";
+import type { DashboardView } from "@/lib/hr-types";
 import { initialsOf, type DashboardData, type Employee, type RosterEntry } from "@/lib/hr-types";
 import { SummaryStrip } from "@/components/dashboard/SummaryStrip";
 import { EmployeeCard } from "@/components/dashboard/EmployeeCard";
@@ -45,11 +44,21 @@ const ROLE_ORDER = ["supervisor", "designer", "ea"] as const;
 
 function DashboardPage() {
   const navigate = useNavigate();
-  const fetchDashboard = useServerFn(getDashboard);
-
-  const { data: view, isLoading, error, refetch, isFetching } = useQuery({
+  const { data: view, isLoading, error, refetch, isFetching } = useQuery<DashboardView>({
     queryKey: ["hr-dashboard"],
-    queryFn: () => fetchDashboard(),
+    queryFn: async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Your session has expired. Please sign in again.");
+      const response = await fetch("/api/dashboard", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.message ?? payload?.error ?? "Could not load the dashboard.");
+      }
+      return payload as DashboardView;
+    },
     staleTime: 60_000,
   });
 
