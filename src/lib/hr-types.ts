@@ -41,6 +41,14 @@ export interface TaskActivityEntry {
   notes: string;
 }
 
+export interface ReportCardDetail {
+  month: string;
+  scoreBuilt: string[];
+  whyScore: string[];
+  improveNextMonth: string[];
+  downloadPath: string;
+}
+
 export interface Employee {
   id: string;
   name: string;
@@ -65,6 +73,7 @@ export interface Employee {
   filingDiscipline: number | null;
   dprActivity: DprActivityEntry[];
   taskActivity: TaskActivityEntry[];
+  reportCard?: ReportCardDetail;
 }
 
 export interface DashboardData {

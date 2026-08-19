@@ -166,6 +166,11 @@ function ManagerView({ month, months, roster, own }: { month: string; months: st
 
   return (
     <div className="space-y-8">
+      <section className="grid gap-4 lg:grid-cols-2">
+        <UploadAttendanceCard months={months} />
+        <UploadWhatsAppCard months={months} />
+      </section>
+
       {own ? (
         <section className="panel space-y-3 p-5">
           <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">My report card</h2>
@@ -207,6 +212,8 @@ function ManagerView({ month, months, roster, own }: { month: string; months: st
           Team names and roles are visible to managers. Performance scores are limited to each manager’s own report card and administrators.
         </p>
       </section>
+
+      <AskTeamChat />
     </div>
   );
 }
