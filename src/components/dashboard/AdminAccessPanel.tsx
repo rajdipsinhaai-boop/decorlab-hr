@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { listAccessUsers, saveAccessUser } from "@/lib/hr.functions";
+import { forceConfirmUser, listAccessUsers, saveAccessUser } from "@/lib/hr.functions";
 import type { AccessUser, ViewerRole } from "@/lib/hr-types";
 
 const ROLE_LABEL: Record<ViewerRole, string> = {
@@ -17,11 +17,13 @@ const ROLE_LABEL: Record<ViewerRole, string> = {
 export function AdminAccessPanel() {
   const loadUsers = useServerFn(listAccessUsers);
   const saveUser = useServerFn(saveAccessUser);
+  const confirmUser = useServerFn(forceConfirmUser);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<ViewerRole>("employee");
   const [employeeId, setEmployeeId] = useState("");
   const [employeeName, setEmployeeName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [confirmingEmail, setConfirmingEmail] = useState<string | null>(null);
 
   const users = useQuery<AccessUser[]>({
     queryKey: ["access-users"],
@@ -121,7 +123,27 @@ export function AdminAccessPanel() {
                   <td className="px-3 py-2 font-medium">{user.email}</td>
                   <td className="px-3 py-2 text-primary">{ROLE_LABEL[user.role] ?? user.role}</td>
                   <td className="px-3 py-2 text-muted-foreground">{user.employeeName || user.employeeId || "—"}</td>
-                  <td className="px-3 py-2 text-muted-foreground">Use Create account on the sign-in page</td>
+                  <td className="px-3 py-2 text-muted-foreground">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={confirmingEmail === user.email}
+                      onClick={async () => {
+                        setConfirmingEmail(user.email);
+                        try {
+                          await confirmUser({ data: { email: user.email } });
+                          toast.success("Account activated", { description: `${user.email} can now sign in.` });
+                        } catch (error) {
+                          toast.error("Could not activate account", { description: error instanceof Error ? error.message : "Unknown error" });
+                        } finally {
+                          setConfirmingEmail(null);
+                        }
+                      }}
+                    >
+                      {confirmingEmail === user.email ? "Activating…" : "Confirm account"}
+                    </Button>
+                  </td>
                 </tr>
               ))}
             </tbody>
