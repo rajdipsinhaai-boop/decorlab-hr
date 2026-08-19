@@ -1,4 +1,4 @@
-import { createSign } from "node:crypto";
+import { createPrivateKey, createSign } from "node:crypto";
 
 type ServiceAccountJson = {
   client_email: string;
@@ -72,10 +72,22 @@ async function createAccessToken() {
     }),
   );
   const unsigned = `${header}.${claim}`;
+  const privateKey = normalizePrivateKey(credentials.private_key);
+  const body = privateKey
+    .replace(/-----BEGIN [^-]+-----|-----END [^-]+-----/g, "")
+    .replace(/\s+/g, "");
+  console.info("Google service-account key shape", {
+    length: privateKey.length,
+    hasBegin: privateKey.includes("BEGIN PRIVATE KEY"),
+    hasEnd: privateKey.includes("END PRIVATE KEY"),
+    newlineCount: privateKey.split("\\n").length - 1,
+    bodyLength: body.length,
+  });
+  const keyObject = createPrivateKey({ key: privateKey, format: "pem", type: "pkcs8" });
   const signer = createSign("RSA-SHA256");
   signer.update(unsigned);
   signer.end();
-  const signature = base64Url(signer.sign(credentials.private_key));
+  const signature = base64Url(signer.sign(keyObject));
   const assertion = `${unsigned}.${signature}`;
 
   const tokenUri = credentials.token_uri ?? "https://oauth2.googleapis.com/token";
