@@ -9,7 +9,7 @@ SELECT cron.schedule(
   '*/20 * * * *',
   $$
   SELECT extensions.http_post(
-    url := 'https://project--3b834ccc-70bb-4477-a3d2-652f53bb15f5.lovable.app/api/public/cron/process-queue',
+    url := 'https://decorlab-hr.vercel.app/api/public/cron/process-queue',
     headers := '{"Content-Type": "application/json", "apikey": "sb_publishable_TQuT4Zh3-lqtUqzdjlrXSg_PNmIeze2"}'::jsonb,
     body := '{"source": "pg_cron"}'::jsonb,
     timeout_milliseconds := 60000
