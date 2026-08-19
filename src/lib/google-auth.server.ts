@@ -8,6 +8,17 @@ type ServiceAccountJson = {
 
 let cachedToken: { value: string; expiresAt: number } | undefined;
 
+function normalizePrivateKey(value: string): string {
+  let key = value.trim().replace(/^['"]|['"]$/g, "");
+  key = key.replace(/\\n/g, "\n").replace(/\\r/g, "\r").replace(/\r\n/g, "\n");
+  const match = key.match(/-----BEGIN ([^-]+)-----([\s\S]*?)-----END \1-----/);
+  if (!match) return key;
+  const label = match[1];
+  const body = match[2].replace(/\s+/g, "");
+  const wrapped = body.match(/.{1,64}/g)?.join("\n") ?? body;
+  return `-----BEGIN ${label}-----\n${wrapped}\n-----END ${label}-----\n`;
+}
+
 function readServiceAccount(): ServiceAccountJson {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (raw) {
@@ -16,7 +27,7 @@ function readServiceAccount(): ServiceAccountJson {
       if (parsed.client_email && parsed.private_key) {
         return {
           client_email: parsed.client_email,
-          private_key: parsed.private_key.replace(/\\n/g, "\n"),
+          private_key: normalizePrivateKey(parsed.private_key),
           token_uri: parsed.token_uri,
         };
       }
@@ -30,13 +41,11 @@ function readServiceAccount(): ServiceAccountJson {
   if (clientEmail && privateKey) {
     return {
       client_email: clientEmail,
-      private_key: privateKey.replace(/\\n/g, "\n"),
+      private_key: normalizePrivateKey(privateKey),
     };
   }
 
-  throw new Error(
-    "Google service-account credentials are not configured on the server.",
-  );
+  throw new Error("Google service-account credentials are not configured on the server.");
 }
 
 function base64Url(value: string | Uint8Array) {
@@ -86,10 +95,7 @@ async function createAccessToken() {
     console.error(`Google token request failed [${response.status}]: ${body}`);
     throw new Error("Google authentication failed for the server integration.");
   }
-  const json = (await response.json()) as {
-    access_token?: string;
-    expires_in?: number;
-  };
+  const json = (await response.json()) as { access_token?: string; expires_in?: number };
   if (!json.access_token) throw new Error("Google did not return an access token.");
   return {
     value: json.access_token,
