@@ -15,6 +15,7 @@ dist-ssr
 .tanstack/**
 .nitro
 *.local
+google-service-account.json
 
 # Wrangler / Cloudflare
 .wrangler/

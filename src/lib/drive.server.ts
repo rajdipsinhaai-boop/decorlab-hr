@@ -1,58 +1,93 @@
 /**
- * Server-only Google Drive access through the Lovable connector gateway.
- * Credentials never reach the browser.
+ * Server-only Google Drive access through the native Google APIs.
+ * The service-account credential is read only on the server and never reaches the browser.
  */
-const GATEWAY = "https://connector-gateway.lovable.dev/google_drive";
+import { google, drive_v3 } from "googleapis";
+import { Readable } from "node:stream";
 
-function authHeaders() {
-  const lovableKey = process.env["LOVABLE_API_KEY"];
-  const connectionKey = process.env["GOOGLE_DRIVE_API_KEY"];
-  if (!lovableKey || !connectionKey) {
-    throw new Error("Google Drive connection is not configured on the server.");
+type ServiceAccountJson = {
+  client_email: string;
+  private_key: string;
+};
+
+let driveClient: drive_v3.Drive | undefined;
+
+function readServiceAccount(): ServiceAccountJson {
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as Partial<ServiceAccountJson>;
+      if (parsed.client_email && parsed.private_key) {
+        return {
+          client_email: parsed.client_email,
+          private_key: parsed.private_key.replace(/\\n/g, "\n"),
+        };
+      }
+    } catch {
+      throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON.");
+    }
   }
-  return {
-    Authorization: `Bearer ${lovableKey}`,
-    "X-Connection-Api-Key": connectionKey,
-  };
+
+  const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
+  if (clientEmail && privateKey) {
+    return {
+      client_email: clientEmail,
+      private_key: privateKey.replace(/\\n/g, "\n"),
+    };
+  }
+
+  throw new Error(
+    "Google Drive is not configured. Set GOOGLE_SERVICE_ACCOUNT_JSON on the server.",
+  );
 }
 
-async function driveJson(path: string, init?: RequestInit) {
-  const res = await fetch(`${GATEWAY}${path}`, {
-    ...init,
-    headers: { ...authHeaders(), ...(init?.headers ?? {}) },
+function getDriveClient(): drive_v3.Drive {
+  if (driveClient) return driveClient;
+  const credentials = readServiceAccount();
+  const auth = new google.auth.GoogleAuth({
+    credentials,
+    scopes: ["https://www.googleapis.com/auth/drive"],
   });
-  if (!res.ok) {
-    const body = await res.text();
-    console.error(`Drive request failed [${res.status}] ${path}: ${body}`);
-    throw new Error(`Google Drive request failed [${res.status}]`);
-  }
-  return res.json() as Promise<any>;
+  driveClient = google.drive({ version: "v3", auth });
+  return driveClient;
 }
 
-/** Finds a folder by name at Drive root, creating it when missing. */
+function esc(value: string) {
+  return value.replace(/'/g, "\\'");
+}
+
+function parentId() {
+  return process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID ?? "root";
+}
+
+/** Finds a folder by name at the configured Drive root, creating it when missing. */
 export async function findOrCreateFolder(name: string): Promise<string> {
+  const parent = parentId();
   const q = [
-    `name = '${name.replace(/'/g, "\\'")}'`,
+    `name = '${esc(name)}'`,
     "mimeType = 'application/vnd.google-apps.folder'",
     "trashed = false",
-    "'root' in parents",
+    `'${esc(parent)}' in parents`,
   ].join(" and ");
-  const found = await driveJson(
-    `/drive/v3/files?q=${encodeURIComponent(q)}&fields=${encodeURIComponent("files(id,name)")}&pageSize=1`,
-  );
-  const existing = found?.files?.[0]?.id as string | undefined;
+  const found = await getDriveClient().files.list({
+    q,
+    fields: "files(id,name)",
+    pageSize: 1,
+  });
+  const existing = found.data.files?.[0]?.id;
   if (existing) return existing;
 
-  const created = await driveJson(`/drive/v3/files?fields=id`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  const created = await getDriveClient().files.create({
+    requestBody: {
       name,
       mimeType: "application/vnd.google-apps.folder",
-      parents: ["root"],
-    }),
+      parents: [parent],
+    },
+    fields: "id",
   });
-  return created.id as string;
+  if (!created.data.id) throw new Error("Google Drive did not return a folder ID.");
+  return created.data.id;
 }
 
 export interface DriveFile {
@@ -62,22 +97,23 @@ export interface DriveFile {
   modifiedTime?: string;
 }
 
-function esc(v: string) {
-  return v.replace(/'/g, "\\'");
-}
-
 /** Finds a folder by name (optionally under a parent). Returns null when missing. */
-export async function findFolder(name: string, parentId = "root"): Promise<string | null> {
+export async function findFolder(
+  name: string,
+  parentIdValue = parentId(),
+): Promise<string | null> {
   const q = [
     `name = '${esc(name)}'`,
     "mimeType = 'application/vnd.google-apps.folder'",
     "trashed = false",
-    `'${esc(parentId)}' in parents`,
+    `'${esc(parentIdValue)}' in parents`,
   ].join(" and ");
-  const found = await driveJson(
-    `/drive/v3/files?q=${encodeURIComponent(q)}&fields=${encodeURIComponent("files(id,name)")}&pageSize=5`,
-  );
-  return (found?.files?.[0]?.id as string | undefined) ?? null;
+  const found = await getDriveClient().files.list({
+    q,
+    fields: "files(id,name)",
+    pageSize: 5,
+  });
+  return found.data.files?.[0]?.id ?? null;
 }
 
 export function folderLink(folderId: string) {
@@ -95,44 +131,46 @@ export function fileIdFromLink(link: string): string | null {
 
 export async function listFolderFiles(folderId: string): Promise<DriveFile[]> {
   const q = `'${esc(folderId)}' in parents and trashed = false`;
-  const json = await driveJson(
-    `/drive/v3/files?q=${encodeURIComponent(q)}&fields=${encodeURIComponent(
-      "files(id,name,mimeType,modifiedTime)",
-    )}&orderBy=${encodeURIComponent("modifiedTime desc")}&pageSize=200`,
-  );
-  return (json?.files ?? []) as DriveFile[];
+  const response = await getDriveClient().files.list({
+    q,
+    fields: "files(id,name,mimeType,modifiedTime)",
+    orderBy: "modifiedTime desc",
+    pageSize: 200,
+  });
+  return (response.data.files ?? []) as DriveFile[];
 }
 
 export async function getFileMeta(fileId: string): Promise<DriveFile> {
-  return (await driveJson(
-    `/drive/v3/files/${fileId}?fields=${encodeURIComponent("id,name,mimeType,modifiedTime")}`,
-  )) as DriveFile;
-}
-
-async function driveRaw(path: string): Promise<Response> {
-  const res = await fetch(`${GATEWAY}${path}`, { headers: authHeaders() });
-  if (!res.ok) {
-    const body = await res.text();
-    console.error(`Drive download failed [${res.status}] ${path}: ${body}`);
-    throw new Error(`Google Drive download failed [${res.status}]`);
-  }
-  return res;
+  const response = await getDriveClient().files.get({
+    fileId,
+    fields: "id,name,mimeType,modifiedTime",
+  });
+  return response.data as DriveFile;
 }
 
 /** Raw bytes of a binary Drive file (PDF, txt, ...). */
 export async function downloadFileBytes(fileId: string): Promise<Uint8Array> {
-  const res = await driveRaw(`/drive/v3/files/${fileId}?alt=media`);
-  return new Uint8Array(await res.arrayBuffer());
+  const response = await getDriveClient().files.get(
+    { fileId, alt: "media" },
+    { responseType: "arraybuffer" },
+  );
+  return new Uint8Array(response.data as ArrayBuffer);
 }
 
 /** CSV text of a Google Sheets file, or plain text of a CSV/text file. */
 export async function downloadAsCsv(file: DriveFile): Promise<string> {
   if (file.mimeType === "application/vnd.google-apps.spreadsheet") {
-    const res = await driveRaw(`/drive/v3/files/${file.id}/export?mimeType=text%2Fcsv`);
-    return res.text();
+    const response = await getDriveClient().files.export(
+      { fileId: file.id, mimeType: "text/csv" },
+      { responseType: "text" },
+    );
+    return String(response.data);
   }
-  const res = await driveRaw(`/drive/v3/files/${file.id}?alt=media`);
-  return res.text();
+  const response = await getDriveClient().files.get(
+    { fileId: file.id, alt: "media" },
+    { responseType: "text" },
+  );
+  return String(response.data);
 }
 
 export function bytesToBase64(bytes: Uint8Array): string {
@@ -144,36 +182,25 @@ export function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-/** Uploads a file (base64 payload) into a folder and returns its shareable Drive link. */
+/** Uploads a file into a Drive folder and returns its shareable Drive link. */
 export async function uploadFile(opts: {
   folderId: string;
   filename: string;
   mimeType: string;
   base64: string;
 }): Promise<string> {
-  const boundary = `decorlab-${crypto.randomUUID()}`;
-  const metadata = JSON.stringify({ name: opts.filename, parents: [opts.folderId] });
-  const body =
-    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n` +
-    `--${boundary}\r\nContent-Type: ${opts.mimeType}\r\nContent-Transfer-Encoding: base64\r\n\r\n${opts.base64}\r\n` +
-    `--${boundary}--`;
-
-  const res = await fetch(
-    `${GATEWAY}/upload/drive/v3/files?uploadType=multipart&fields=${encodeURIComponent("id,webViewLink")}`,
-    {
-      method: "POST",
-      headers: {
-        ...authHeaders(),
-        "Content-Type": `multipart/related; boundary=${boundary}`,
-      },
-      body,
+  const response = await getDriveClient().files.create({
+    requestBody: {
+      name: opts.filename,
+      parents: [opts.folderId],
     },
-  );
-  if (!res.ok) {
-    const text = await res.text();
-    console.error(`Drive upload failed [${res.status}]: ${text}`);
-    throw new Error(`Could not upload the file to Drive [${res.status}]`);
-  }
-  const json = (await res.json()) as { id: string; webViewLink?: string };
-  return json.webViewLink ?? `https://drive.google.com/file/d/${json.id}/view`;
+    media: {
+      mimeType: opts.mimeType,
+      body: Readable.from(Buffer.from(opts.base64, "base64")),
+    },
+    fields: "id,webViewLink",
+  });
+  const id = response.data.id;
+  if (!id) throw new Error("Google Drive did not return an uploaded file ID.");
+  return response.data.webViewLink ?? `https://drive.google.com/file/d/${id}/view`;
 }
