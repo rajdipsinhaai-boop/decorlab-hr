@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { ControlRow, DashboardView, ViewerRole } from "./hr-types";
+import type { AccessUser, ControlRow, DashboardView, ViewerRole } from "./hr-types";
 
 const CONTROL_RANGE = "Control!A:H";
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -10,26 +10,70 @@ function utcStamp() {
   return new Date().toISOString().replace("T", " ").slice(0, 19);
 }
 
+type AccessProfile = { role: ViewerRole; employeeId: string | null; employeeName: string | null };
+
+function configuredProfile(email: string): AccessProfile | null {
+  const admins = (process.env.ACCESS_ADMIN_EMAILS ?? "rajdipsinhaai@gmail.com")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  if (admins.includes(email)) return { role: "admin", employeeId: null, employeeName: null };
+
+  try {
+    const profiles = JSON.parse(process.env.ACCESS_PROFILES_JSON ?? "{}").profiles ?? {};
+    const profile = profiles[email];
+    if (!profile) return null;
+    const role = profile.role === "admin" || profile.role === "manager" || profile.role === "employee" ? profile.role : null;
+    if (!role) return null;
+    return {
+      role,
+      employeeId: typeof profile.employeeId === "string" ? profile.employeeId : null,
+      employeeName: typeof profile.employeeName === "string" ? profile.employeeName : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function assertAllowed(context: {
   supabase: any;
   claims: any;
-}): Promise<{ email: string; role: ViewerRole }> {
+}): Promise<{ email: string; role: ViewerRole; employeeId: string | null; employeeName: string | null }> {
   const email = (context.claims?.email ?? "").toString().toLowerCase();
   if (!email) throw new Error("No email on this account.");
-  const { data, error } = await context.supabase
+  const configured = configuredProfile(email);
+  if (configured) return { email, ...configured };
+
+  let data: any;
+  let error: any;
+  ({ data, error } = await context.supabase
     .from("allowed_emails")
-    .select("email, role")
+    .select("email, role, employee_id, employee_name")
     .ilike("email", email)
-    .maybeSingle();
+    .maybeSingle());
+  if (error) {
+    ({ data, error } = await context.supabase
+      .from("allowed_emails")
+      .select("email, role")
+      .ilike("email", email)
+      .maybeSingle());
+  }
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Your account is not on the Decorlab HR access list.");
-  return { email, role: (data.role as ViewerRole) ?? "leadership" };
+  const role = data.role === "leadership" || data.role === "admin" ? "admin" : data.role === "manager" ? "manager" : "employee";
+  return { email, role, employeeId: data.employee_id ?? null, employeeName: data.employee_name ?? null };
 }
 
-/** Leadership-only surfaces (scores, reports, AI assistant). */
+async function assertAdmin(context: { supabase: any; claims: any }): Promise<string> {
+  const { email, role } = await assertAllowed(context);
+  if (role !== "admin") throw new Error("Only administrators can manage user access.");
+  return email;
+}
+
+/** Admin-only surfaces (scores, reports, AI assistant, and access management). */
 async function assertLeadership(context: { supabase: any; claims: any }): Promise<string> {
   const { email, role } = await assertAllowed(context);
-  if (role !== "leadership") {
+  if (role !== "admin") {
     throw new Error("Your account does not have access to performance scores.");
   }
   return email;
@@ -38,15 +82,19 @@ async function assertLeadership(context: { supabase: any; claims: any }): Promis
 export const getDashboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<DashboardView> => {
-    const { role } = await assertAllowed(context as never);
+    const { role, employeeId, employeeName } = await assertAllowed(context as never);
     const { loadDashboard } = await import("./hr.server");
     const data = await loadDashboard();
     if (role === "manager") {
-      // Managers only ever receive names and roles — no scores leave the server.
+      const own = data.employees.find((e) =>
+        (employeeId && e.id === employeeId) ||
+        (employeeName && e.name.toLowerCase() === employeeName.toLowerCase()),
+      ) ?? null;
       return {
         viewerRole: "manager",
         month: data.month,
         months: data.months,
+        own,
         roster: data.employees.map((e) => ({
           id: e.id,
           name: e.name,
@@ -55,7 +103,91 @@ export const getDashboard = createServerFn({ method: "GET" })
         })),
       };
     }
-    return { viewerRole: "leadership", data };
+    if (role === "employee") {
+      const employee = data.employees.find((e) =>
+        (employeeId && e.id === employeeId) ||
+        (employeeName && e.name.toLowerCase() === employeeName.toLowerCase()),
+      ) ?? null;
+      return { viewerRole: "employee", month: data.month, employee };
+    }
+    return { viewerRole: "admin", data };
+  });
+
+export const listAccessUsers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<AccessUser[]> => {
+    await assertAdmin(context as never);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let data: any[] | null = null;
+    let error: any = null;
+    ({ data, error } = await supabaseAdmin
+      .from("allowed_emails")
+      .select("id, email, role, employee_id, employee_name, created_at")
+      .order("created_at", { ascending: true }));
+    if (error) {
+      ({ data, error } = await supabaseAdmin
+        .from("allowed_emails")
+        .select("id, email, role, created_at")
+        .order("created_at", { ascending: true }));
+    }
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((row: any) => ({
+      id: row.id,
+      email: row.email,
+      role: row.role as ViewerRole,
+      employeeId: row.employee_id ?? null,
+      employeeName: row.employee_name ?? null,
+      createdAt: row.created_at,
+    }));
+  });
+
+export const saveAccessUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { email: string; role: ViewerRole; employeeId?: string; employeeName?: string }) => {
+    const email = (input?.email ?? "").trim().toLowerCase();
+    if (!email || !email.includes("@") || email.length > 200) throw new Error("Enter a valid email.");
+    if (!["admin", "manager", "employee"].includes(input.role)) throw new Error("Choose a valid role.");
+    return {
+      email,
+      role: input.role,
+      employeeId: input.employeeId?.trim() || null,
+      employeeName: input.employeeName?.trim() || null,
+    };
+  })
+  .handler(async ({ data, context }): Promise<AccessUser> => {
+    await assertAdmin(context as never);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let row: any;
+    let error: any;
+    ({ data: row, error } = await supabaseAdmin
+      .from("allowed_emails")
+      .upsert(
+        {
+          email: data.email,
+          role: data.role,
+          employee_id: data.employeeId,
+          employee_name: data.employeeName,
+        },
+        { onConflict: "email" },
+      )
+      .select("id, email, role, employee_id, employee_name, created_at")
+      .single());
+    if (error) {
+      ({ data: row, error } = await supabaseAdmin
+        .from("allowed_emails")
+        .upsert({ email: data.email, role: data.role }, { onConflict: "email" })
+        .select("id, email, role, created_at")
+        .single());
+    }
+    if (error) throw new Error(error.message);
+    return {
+      id: row.id,
+      email: row.email,
+      role: row.role as ViewerRole,
+      employeeId: row.employee_id ?? null,
+      employeeName: row.employee_name ?? null,
+      createdAt: row.created_at,
+    };
   });
 
 export const createReportRequest = createServerFn({ method: "POST" })
