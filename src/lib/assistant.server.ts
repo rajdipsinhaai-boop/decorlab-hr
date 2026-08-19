@@ -1,11 +1,9 @@
-/** Server-only, read-only HR assistant backed by Lovable AI Gateway. */
+/** Server-only, read-only HR assistant backed by an optional OpenAI-compatible provider. */
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { generateText } from "ai";
 import { loadDashboard } from "./hr.server";
-import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 
-// Cost-efficient, current-generation model on the Lovable AI Gateway.
-// Swap to "google/gemini-3.1-flash-lite" if you want the cheapest option.
-const MODEL = "google/gemini-3.6-flash";
+const MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
 
 function compactContext(data: Awaited<ReturnType<typeof loadDashboard>>) {
   return {
@@ -37,14 +35,18 @@ export async function answerQuestion(
   question: string,
   history: { role: string; content: string }[],
 ): Promise<string> {
-  const apiKey = process.env["LOVABLE_API_KEY"];
-  if (!apiKey) throw new Error("The assistant is not configured yet (missing LOVABLE_API_KEY).");
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "The assistant is not configured. Set OPENAI_API_KEY on the server to enable it.",
+    );
+  }
 
   const data = await loadDashboard();
   const system = [
     "You are the Decorlab HR analytics assistant. Answer questions about the team using ONLY the JSON data provided below.",
     "You are strictly read-only: you cannot edit the spreadsheet, upload files, or trigger report generation. If asked to do any of those, say so and point the user to the dashboard buttons.",
-    "If the data does not contain the answer (for example a different month, or a person not listed), say plainly that it is not available in the current sheet data instead of guessing.",
+    "If the data does not contain the answer, say plainly that it is not available in the current sheet data instead of guessing.",
     "Be concise, plain-language and specific with numbers. RAG bands: RED below 60%, YELLOW 60-75%, GREEN 75% and above.",
     `DATA: ${JSON.stringify(compactContext(data))}`,
   ].join("\n\n");
@@ -56,18 +58,22 @@ export async function answerQuestion(
     { role: "user" as const, content: question },
   ];
 
-  const gateway = createLovableAiGatewayProvider(apiKey);
+  const provider = createOpenAICompatible({
+    name: "openai-compatible",
+    baseURL: process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1",
+    apiKey,
+  });
 
   try {
     const result = await generateText({
-      model: gateway(MODEL),
+      model: provider(MODEL),
       system,
       messages,
       temperature: 0.3,
     });
     return result.text.trim() || "I couldn't produce an answer for that.";
   } catch (error) {
-    console.error("Lovable AI Gateway assistant error:", error);
+    console.error("OpenAI-compatible assistant error:", error);
     throw new Error("The assistant could not answer right now. Please try again in a moment.");
   }
 }
