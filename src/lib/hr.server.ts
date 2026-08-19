@@ -1,4 +1,5 @@
 import { batchGet, SCHEDULED_START_MINUTES } from "./sheets.server";
+import { fallbackBatchGet } from "./fallback.server";
 import {
   ragOf,
   type AttendanceDay,
@@ -247,7 +248,13 @@ export async function loadDashboard(): Promise<DashboardData> {
     "EA KRA!A3:Q200",
     "Daily Attendance!A3:I5000",
   ];
-  const data = await batchGet(ranges);
+  let data: Record<string, string[][]>;
+  try {
+    data = await batchGet(ranges);
+  } catch (error) {
+    console.warn("Google Sheets unavailable; using the attached workbook fallback.", error);
+    data = fallbackBatchGet(ranges);
+  }
 
   const month = reviewMonth(data[ranges[0]!] ?? []) || "Current period";
   const master = data[ranges[1]!] ?? [];
@@ -380,7 +387,13 @@ export async function loadDashboard(): Promise<DashboardData> {
 
 export async function loadControlRows(): Promise<ControlRow[]> {
   const range = "Control!A3:H500";
-  const grid = (await batchGet([range]))[range] ?? [];
+  let grid: string[][];
+  try {
+    grid = (await batchGet([range]))[range] ?? [];
+  } catch (error) {
+    console.warn("Google Sheets unavailable; using the attached workbook Control fallback.", error);
+    grid = fallbackBatchGet([range])[range] ?? [];
+  }
   return grid.slice(1).flatMap((row) => {
     const requestId = cell(row, 0);
     if (!requestId) return [];
