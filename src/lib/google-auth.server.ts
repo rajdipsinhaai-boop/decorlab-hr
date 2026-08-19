@@ -20,7 +20,10 @@ function normalizePrivateKey(value: string): string {
 }
 
 function readServiceAccount(): ServiceAccountJson {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  const encoded = process.env.GOOGLE_SERVICE_ACCOUNT_JSON_B64;
+  const raw = encoded
+    ? Buffer.from(encoded.trim(), "base64").toString("utf8")
+    : process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (raw) {
     try {
       const parsed = JSON.parse(raw) as Partial<ServiceAccountJson>;
