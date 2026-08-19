@@ -1,5 +1,6 @@
 import { batchGet, SCHEDULED_START_MINUTES } from "./sheets.server";
 import { fallbackBatchGet } from "./fallback.server";
+import reportCards from "@/data/report-cards.json";
 import {
   ragOf,
   type AttendanceDay,
@@ -15,6 +16,17 @@ import {
 } from "./hr-types";
 
 const TARGET_HOURS = 9;
+
+type ReportCardSnapshot = {
+  month: string;
+  scoreBuilt: string[];
+  whyScore: string[];
+  improveNextMonth: string[];
+  pdfFilename: string;
+  pdfBase64: string;
+};
+
+const REPORT_CARDS = reportCards as Record<string, ReportCardSnapshot>;
 
 type Grid = string[][];
 
@@ -345,6 +357,8 @@ export async function loadDashboard(): Promise<DashboardData> {
       .map((m) => m - SCHEDULED_START_MINUTES);
     const hoursList = present.map((d) => d.hours).filter((h) => h > 0);
 
+    const reportCard = REPORT_CARDS[name.toLowerCase()];
+
     employees.push({
       id: cell(row, mi.id) || name,
       name,
@@ -371,6 +385,15 @@ export async function loadDashboard(): Promise<DashboardData> {
       filingDiscipline: activity.filing[name] ?? null,
       dprActivity: activity.dpr[name] ?? [],
       taskActivity: activity.task[name] ?? [],
+      reportCard: reportCard
+        ? {
+            month: reportCard.month,
+            scoreBuilt: reportCard.scoreBuilt,
+            whyScore: reportCard.whyScore,
+            improveNextMonth: reportCard.improveNextMonth,
+            downloadPath: `/api/report-card?name=${encodeURIComponent(name)}`,
+          }
+        : undefined,
     });
   }
 

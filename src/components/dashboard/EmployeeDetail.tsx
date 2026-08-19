@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { Download, FileText } from "lucide-react";
 import {
   PolarAngleAxis,
   PolarGrid,
@@ -7,6 +9,8 @@ import {
   Tooltip,
 } from "recharts";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 import { ScoreRing } from "./ScoreRing";
 import { AttendanceHeatmap } from "./AttendanceHeatmap";
 import { ActivitySection } from "./ActivitySection";
@@ -96,35 +100,61 @@ export function EmployeeDetail({
               </ul>
             </section>
 
+            {employee.reportCard ? (
+              <section className="space-y-4 rounded-xl border border-primary/20 bg-secondary/20 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-primary" />
+                    <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Detailed report card
+                    </h4>
+                  </div>
+                  <ReportCardDownloadButton
+                    path={employee.reportCard.downloadPath}
+                    filename={`${employee.name} - ${employee.reportCard.month} Report Card.pdf`}
+                  />
+                </div>
+                {employee.reportCard.scoreBuilt.length ? (
+                  <NarrativeList title="How this score was built" items={employee.reportCard.scoreBuilt} />
+                ) : null}
+                {employee.reportCard.whyScore.length ? (
+                  <NarrativeList title="Why this score" items={employee.reportCard.whyScore} />
+                ) : null}
+                {employee.reportCard.improveNextMonth.length ? (
+                  <NarrativeList title="What to improve next month" items={employee.reportCard.improveNextMonth} />
+                ) : null}
+              </section>
+            ) : null}
+
             {employee.criteria.length ? (
               <section className="space-y-2">
                 <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   Rated criteria (1-5)
                 </h4>
-                 <div className="h-72 w-full">
+                <div className="h-72 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                      <RadarChart data={employee.criteria} outerRadius="72%">
-                        <PolarGrid stroke="var(--border)" />
-                        <PolarAngleAxis
-                          dataKey="name"
-                          tick={{ fill: "var(--muted-foreground)", fontSize: 9 }}
-                        />
-                        <Radar
-                          dataKey="rating"
-                          stroke="var(--primary)"
-                          fill="var(--primary)"
-                          fillOpacity={0.35}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            background: "var(--popover)",
-                            border: "1px solid var(--border)",
-                            borderRadius: 10,
-                            color: "var(--popover-foreground)",
-                            fontSize: 12,
-                          }}
-                        />
-                      </RadarChart>
+                    <RadarChart data={employee.criteria} outerRadius="72%">
+                      <PolarGrid stroke="var(--border)" />
+                      <PolarAngleAxis
+                        dataKey="name"
+                        tick={{ fill: "var(--muted-foreground)", fontSize: 9 }}
+                      />
+                      <Radar
+                        dataKey="rating"
+                        stroke="var(--primary)"
+                        fill="var(--primary)"
+                        fillOpacity={0.35}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          background: "var(--popover)",
+                          border: "1px solid var(--border)",
+                          borderRadius: 10,
+                          color: "var(--popover-foreground)",
+                          fontSize: 12,
+                        }}
+                      />
+                    </RadarChart>
                   </ResponsiveContainer>
                 </div>
               </section>
@@ -142,5 +172,54 @@ export function EmployeeDetail({
         ) : null}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function NarrativeList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-semibold text-foreground">{title}</p>
+      <ul className="space-y-1 text-xs leading-relaxed text-muted-foreground">
+        {items.map((item, index) => (
+          <li key={`${title}-${index}`} className="flex gap-2">
+            <span className="text-primary">•</span>
+            <span>{item.replace(/^[-•>]\s*/, "")}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ReportCardDownloadButton({ path, filename }: { path: string; filename: string }) {
+  const [downloading, setDownloading] = useState(false);
+
+  const download = async () => {
+    setDownloading(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("Your session has expired. Please sign in again.");
+      const response = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
+      if (!response.ok) throw new Error("Report card could not be downloaded.");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <Button type="button" variant="outline" size="sm" onClick={download} disabled={downloading}>
+      <Download className="mr-1.5 h-3.5 w-3.5" />
+      {downloading ? "Preparing…" : "Download PDF"}
+    </Button>
   );
 }

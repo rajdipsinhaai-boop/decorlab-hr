@@ -13,6 +13,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as ApiDashboardRouteImport } from './routes/api/dashboard'
+import { Route as ApiReportCardRouteImport } from './routes/api/report-card'
 import { Route as ApiPublicCronProcessQueueRouteImport } from './routes/api/public/cron/process-queue'
 
 const IndexRoute = IndexRouteImport.update({
@@ -34,6 +36,16 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiDashboardRoute = ApiDashboardRouteImport.update({
+  id: '/api/dashboard',
+  path: '/api/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiReportCardRoute = ApiReportCardRouteImport.update({
+  id: '/api/report-card',
+  path: '/api/report-card',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicCronProcessQueueRoute =
   ApiPublicCronProcessQueueRouteImport.update({
     id: '/api/public/cron/process-queue',
@@ -45,12 +57,16 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/api/dashboard': typeof ApiDashboardRoute
+  '/api/report-card': typeof ApiReportCardRoute
   '/api/public/cron/process-queue': typeof ApiPublicCronProcessQueueRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/api/dashboard': typeof ApiDashboardRoute
+  '/api/report-card': typeof ApiReportCardRoute
   '/api/public/cron/process-queue': typeof ApiPublicCronProcessQueueRoute
 }
 export interface FileRoutesById {
@@ -59,19 +75,35 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/api/dashboard': typeof ApiDashboardRoute
+  '/api/report-card': typeof ApiReportCardRoute
   '/api/public/cron/process-queue': typeof ApiPublicCronProcessQueueRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/dashboard' | '/api/public/cron/process-queue'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/dashboard'
+    | '/api/dashboard'
+    | '/api/report-card'
+    | '/api/public/cron/process-queue'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/dashboard' | '/api/public/cron/process-queue'
+  to:
+    | '/'
+    | '/auth'
+    | '/dashboard'
+    | '/api/dashboard'
+    | '/api/report-card'
+    | '/api/public/cron/process-queue'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/dashboard'
+    | '/api/dashboard'
+    | '/api/report-card'
     | '/api/public/cron/process-queue'
   fileRoutesById: FileRoutesById
 }
@@ -79,6 +111,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiDashboardRoute: typeof ApiDashboardRoute
+  ApiReportCardRoute: typeof ApiReportCardRoute
   ApiPublicCronProcessQueueRoute: typeof ApiPublicCronProcessQueueRoute
 }
 
@@ -112,6 +146,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/dashboard': {
+      id: '/api/dashboard'
+      path: '/api/dashboard'
+      fullPath: '/api/dashboard'
+      preLoaderRoute: typeof ApiDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/report-card': {
+      id: '/api/report-card'
+      path: '/api/report-card'
+      fullPath: '/api/report-card'
+      preLoaderRoute: typeof ApiReportCardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/cron/process-queue': {
       id: '/api/public/cron/process-queue'
       path: '/api/public/cron/process-queue'
@@ -137,6 +185,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiDashboardRoute: ApiDashboardRoute,
+  ApiReportCardRoute: ApiReportCardRoute,
   ApiPublicCronProcessQueueRoute: ApiPublicCronProcessQueueRoute,
 }
 export const routeTree = rootRouteImport
