@@ -185,7 +185,7 @@ importers:
         version: 9.39.5
       '@lovable.dev/vite-tanstack-config':
         specifier: 2.13.1
-        version: 2.13.1(@emnapi/core@1.11.3)(@emnapi/runtime@1.11.3)(@tailwindcss/vite@4.3.3(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(@tanstack/react-start@1.168.32(crossws@0.4.10(srvx@0.11.22))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(supports-color@7.2.0)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(@vitejs/plugin-react@5.2.0(supports-color@7.2.0)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(nitro@3.0.260603-beta(chokidar@5.0.0)(jiti@2.7.0)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(vite-tsconfig-paths@6.1.1(supports-color@7.2.0)(typescript@5.9.3)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0))
+        version: 2.13.1(@emnapi/core@1.11.3)(@emnapi/runtime@1.11.3)(@tailwindcss/vite@4.3.3(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(@tanstack/react-start@1.168.32(crossws@0.4.10(srvx@0.11.22))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(supports-color@7.2.0)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(@vitejs/plugin-react@5.2.0(supports-color@7.2.0)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(nitro@3.0.260610-beta(chokidar@5.0.0)(jiti@2.7.0)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(vite-tsconfig-paths@6.1.1(supports-color@7.2.0)(typescript@5.9.3)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0))
       '@types/node':
         specifier: ^22.16.5
         version: 22.20.1
@@ -217,8 +217,8 @@ importers:
         specifier: ^15.15.0
         version: 15.15.0
       nitro:
-        specifier: 3.0.260603-beta
-        version: 3.0.260603-beta(chokidar@5.0.0)(jiti@2.7.0)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0))
+        specifier: 3.0.260610-beta
+        version: 3.0.260610-beta(chokidar@5.0.0)(jiti@2.7.0)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0))
       prettier:
         specifier: ^3.7.3
         version: 3.9.6
@@ -2344,12 +2344,12 @@ packages:
       crossws:
         optional: true
 
-  h3@2.0.1-rc.26:
-    resolution: {integrity: sha512-GDxlvDsKxgjRvG5UBRJYyGJTMWLV30CJ4cV+e7QCTgftDHihrvio1fVPbNembhEr6J4WNm8IWy3fookgyTweLw==}
+  h3@2.0.1-rc.22:
+    resolution: {integrity: sha512-Esv0DMIuPkCTSWCA0vO73vcTqwzH1wjSrAO1TXNu/K3up1sZHa9EKMapbmxCDYBeymC3fVTk4qxp7ogQWQ+KgA==}
     engines: {node: '>=20.11.1'}
     hasBin: true
     peerDependencies:
-      crossws: ^0.4.9
+      crossws: ^0.4.1
     peerDependenciesMeta:
       crossws:
         optional: true
@@ -2764,16 +2764,16 @@ packages:
   nf3@0.3.23:
     resolution: {integrity: sha512-RWVLAWozmVD3AaDmaU3qMGB3v+yNlH5d9qqStI4e/WLlNQVnJ4YErGDbYCIrGFyrHdbF6I6Baf0Ae6c7tFYmSg==}
 
-  nitro@3.0.260603-beta:
-    resolution: {integrity: sha512-ffaSHK00a7YDlDizoEHwcxPwpQpdBRRA8k42ymTsRnfl3ipGeKgv4gnPr6DgmCNTo4tYVPK3bHBEv1gNhWpo/A==}
+  nitro@3.0.260610-beta:
+    resolution: {integrity: sha512-KPb4L5yaF/Rx/xoGMpgHRJvZhbhGiqbRKOwwPLCH9jKTKTsEUHLjnJas85AeCzaswqa8Wi52eQBtRsODC4PS0Q==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
     peerDependencies:
-      '@vercel/queue': ^0.2.0
+      '@vercel/queue': ^0.3.0
       dotenv: '*'
       giget: '*'
       jiti: ^2.7.0
-      rollup: ^4.60.4
+      rollup: ^4.61.1
       vite: ^7 || ^8
       xml2js: ^0.6.2
       zephyr-agent: ^0.2.0
@@ -3004,9 +3004,6 @@ packages:
   rou3@0.8.1:
     resolution: {integrity: sha512-ePa+XGk00/3HuCqrEnK3LxJW7I0SdNg6EFzKUJG73hMAdDcOUC/i/aSz7LSDwLrGr33kal/rqOGydzwl6U7zBA==}
 
-  rou3@0.9.2:
-    resolution: {integrity: sha512-3SOzvaAg8rkHrXtRjpCvCvbyO5to9oOO27Z/XqHEYXfMRVSw/qMIVdmaOk9W2lcRLtR6dlqTjo9hDeJk70QBYQ==}
-
   scheduler@0.27.0:
     resolution: {integrity: sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==}
 
@@ -3064,11 +3061,6 @@ packages:
 
   srvx@0.11.22:
     resolution: {integrity: sha512-LqZxxBDMKuMAZzFzJnDCkFOrs9MZQZr0LvHiO/SuSZVdQaXD7xQ5UWTUxheJrQPve1qk9MG2B/yttUvJxw8egQ==}
-    engines: {node: '>=20.16.0'}
-    hasBin: true
-
-  srvx@0.12.5:
-    resolution: {integrity: sha512-IuvtDNQg5EIwv3c6dleyau7u8hCyGQ7D6+V/QM799Aud07z0wCUcurKLTRfyG33C8oUY+UWcVBFkfHMcbtmRLA==}
     engines: {node: '>=20.16.0'}
     hasBin: true
 
@@ -3717,7 +3709,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@lovable.dev/vite-tanstack-config@2.13.1(@emnapi/core@1.11.3)(@emnapi/runtime@1.11.3)(@tailwindcss/vite@4.3.3(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(@tanstack/react-start@1.168.32(crossws@0.4.10(srvx@0.11.22))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(supports-color@7.2.0)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(@vitejs/plugin-react@5.2.0(supports-color@7.2.0)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(nitro@3.0.260603-beta(chokidar@5.0.0)(jiti@2.7.0)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(vite-tsconfig-paths@6.1.1(supports-color@7.2.0)(typescript@5.9.3)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0))':
+  '@lovable.dev/vite-tanstack-config@2.13.1(@emnapi/core@1.11.3)(@emnapi/runtime@1.11.3)(@tailwindcss/vite@4.3.3(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(@tanstack/react-start@1.168.32(crossws@0.4.10(srvx@0.11.22))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(supports-color@7.2.0)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(@vitejs/plugin-react@5.2.0(supports-color@7.2.0)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(nitro@3.0.260610-beta(chokidar@5.0.0)(jiti@2.7.0)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(vite-tsconfig-paths@6.1.1(supports-color@7.2.0)(typescript@5.9.3)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)))(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0))':
     dependencies:
       '@tailwindcss/vite': 4.3.3(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0))
       '@tanstack/devtools-vite': 0.8.3(@emnapi/core@1.11.3)(@emnapi/runtime@1.11.3)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0))
@@ -3727,7 +3719,7 @@ snapshots:
       vite: 8.2.1(@types/node@22.20.1)(jiti@2.7.0)
       vite-tsconfig-paths: 6.1.1(supports-color@7.2.0)(typescript@5.9.3)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0))
     optionalDependencies:
-      nitro: 3.0.260603-beta(chokidar@5.0.0)(jiti@2.7.0)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0))
+      nitro: 3.0.260610-beta(chokidar@5.0.0)(jiti@2.7.0)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0))
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'
@@ -5497,10 +5489,10 @@ snapshots:
     optionalDependencies:
       crossws: 0.4.10(srvx@0.11.22)
 
-  h3@2.0.1-rc.26(crossws@0.4.10(srvx@0.11.22)):
+  h3@2.0.1-rc.22(crossws@0.4.10(srvx@0.11.22)):
     dependencies:
-      rou3: 0.9.2
-      srvx: 0.12.5
+      rou3: 0.8.1
+      srvx: 0.11.22
     optionalDependencies:
       crossws: 0.4.10(srvx@0.11.22)
 
@@ -5977,13 +5969,13 @@ snapshots:
 
   nf3@0.3.23: {}
 
-  nitro@3.0.260603-beta(chokidar@5.0.0)(jiti@2.7.0)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)):
+  nitro@3.0.260610-beta(chokidar@5.0.0)(jiti@2.7.0)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)):
     dependencies:
       consola: 3.4.2
       crossws: 0.4.10(srvx@0.11.22)
       db0: 0.3.4
       env-runner: 0.1.16
-      h3: 2.0.1-rc.26(crossws@0.4.10(srvx@0.11.22))
+      h3: 2.0.1-rc.22(crossws@0.4.10(srvx@0.11.22))
       hookable: 6.1.1
       nf3: 0.3.23
       ocache: 0.1.5
@@ -6294,8 +6286,6 @@ snapshots:
 
   rou3@0.8.1: {}
 
-  rou3@0.9.2: {}
-
   scheduler@0.27.0: {}
 
   semver@6.3.1: {}
@@ -6330,8 +6320,6 @@ snapshots:
   space-separated-tokens@2.0.2: {}
 
   srvx@0.11.22: {}
-
-  srvx@0.12.5: {}
 
   stringify-entities@4.0.4:
     dependencies:
