@@ -12,9 +12,15 @@ export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
       { title: "Sign in · Decorlab HR Performance" },
-      { name: "description", content: "Secure sign-in for the Decorlab leadership HR performance dashboard." },
+      {
+        name: "description",
+        content: "Secure sign-in for the Decorlab leadership HR performance dashboard.",
+      },
       { property: "og:title", content: "Sign in · Decorlab HR Performance" },
-      { property: "og:description", content: "Secure sign-in for the Decorlab leadership HR performance dashboard." },
+      {
+        property: "og:description",
+        content: "Secure sign-in for the Decorlab leadership HR performance dashboard.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },
@@ -22,6 +28,26 @@ export const Route = createFileRoute("/auth")({
   }),
   component: AuthPage,
 });
+
+function formatAuthError(error: unknown): string {
+  const message = error instanceof Error ? error.message : "Authentication failed";
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("email not confirmed")) {
+    return "Your email is not confirmed yet. Confirm the email from Supabase, then sign in again. If it did not arrive, use Resend verification email.";
+  }
+  if (normalized.includes("rate limit") || normalized.includes("too many requests")) {
+    return "Supabase has temporarily rate-limited email delivery. Stop retrying and contact the administrator, or try again later.";
+  }
+  if (normalized.includes("invalid login credentials")) {
+    return "The email or password is incorrect. If this is a new account, confirm your email before signing in.";
+  }
+  if (normalized.includes("redirect") && normalized.includes("not allowed")) {
+    return "The authentication redirect is not configured for this site. Contact the administrator so the production URL can be added in Supabase.";
+  }
+
+  return message;
+}
 
 function AuthPage() {
   const navigate = useNavigate();
@@ -40,23 +66,40 @@ function AuthPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
+    const normalizedEmail = email.trim().toLowerCase();
+
     try {
       if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({
+          email: normalizedEmail,
+          password,
+        });
         if (error) throw error;
         navigate({ to: "/dashboard" });
       } else {
-        const { error } = await supabase.auth.signUp({
-          email,
+        const { data, error } = await supabase.auth.signUp({
+          email: normalizedEmail,
           password,
           options: { emailRedirectTo: `${window.location.origin}/dashboard` },
         });
         if (error) throw error;
-        toast.success("Account created", { description: "You can sign in now." });
+
+        if (data.session) {
+          toast.success("Account created", {
+            description: "Your session is active. Opening the dashboard.",
+          });
+          navigate({ to: "/dashboard" });
+          return;
+        }
+
+        toast.success("Account created", {
+          description:
+            "Confirm the email before signing in. If it does not arrive, return here and use Resend verification email.",
+        });
         setMode("signin");
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Sign-in failed");
+      toast.error(formatAuthError(err));
     } finally {
       setBusy(false);
     }
@@ -76,9 +119,11 @@ function AuthPage() {
         options: { emailRedirectTo: `${window.location.origin}/dashboard` },
       });
       if (error) throw error;
-      toast.success("Verification email sent", { description: `Check the inbox for ${targetEmail}.` });
+      toast.success("Verification email sent", {
+        description: `Check the inbox for ${targetEmail}.`,
+      });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not resend verification email");
+      toast.error(formatAuthError(err));
     } finally {
       setResendBusy(false);
     }
@@ -138,13 +183,21 @@ function AuthPage() {
           >
             {resendBusy ? "Sending verification email…" : "Resend verification email"}
           </button>
-        ) : null}
+        ) : (
+          <p className="mt-3 text-center text-xs text-muted-foreground">
+            Ask the administrator to add your email to the access list before creating an account.
+            After signup, confirm the email before signing in. Supabase&apos;s shared email service
+            can be rate-limited; if that appears, contact the administrator instead of retrying.
+          </p>
+        )}
         <button
           type="button"
           className="mt-4 w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
           onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
         >
-          {mode === "signin" ? "First time? Create your account" : "Already have an account? Sign in"}
+          {mode === "signin"
+            ? "First time? Create your account"
+            : "Already have an account? Sign in"}
         </button>
       </div>
     </main>
