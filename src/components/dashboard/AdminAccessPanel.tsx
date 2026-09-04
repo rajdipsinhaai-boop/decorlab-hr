@@ -45,7 +45,7 @@ export function AdminAccessPanel() {
         },
       });
       toast.success("Access profile saved", {
-        description: `${email.toLowerCase()} can now create an account as ${ROLE_LABEL[role]}.`,
+        description: `${email.toLowerCase()} can now sign in as ${ROLE_LABEL[role]}.`,
       });
       setEmail("");
       setEmployeeId("");
@@ -67,17 +67,30 @@ export function AdminAccessPanel() {
           <ShieldCheck className="h-5 w-5" />
         </span>
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Access management</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">
+            Access management
+          </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Approve an email before the person uses <strong>Create account</strong>. Employee and manager records can be linked by Employee ID or exact name.
+            Anyone can use <strong>Create account</strong>. Use this panel to assign Admin or
+            Manager access, or link an account to an Employee Master record by Employee ID or exact
+            name.
           </p>
         </div>
       </div>
 
-      <form onSubmit={onSubmit} className="grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_1.5fr_auto] lg:items-end">
+      <form
+        onSubmit={onSubmit}
+        className="grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_1.5fr_auto] lg:items-end"
+      >
         <label className="space-y-1.5 text-xs text-muted-foreground">
           Email
-          <Input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="person@decorlab.in" />
+          <Input
+            type="email"
+            required
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="person@decorlab.in"
+          />
         </label>
         <label className="space-y-1.5 text-xs text-muted-foreground">
           Role
@@ -93,11 +106,19 @@ export function AdminAccessPanel() {
         </label>
         <label className="space-y-1.5 text-xs text-muted-foreground">
           Employee ID
-          <Input value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} placeholder="DLB-SUP-01" />
+          <Input
+            value={employeeId}
+            onChange={(event) => setEmployeeId(event.target.value)}
+            placeholder="DLB-SUP-01"
+          />
         </label>
         <label className="space-y-1.5 text-xs text-muted-foreground">
           Employee name
-          <Input value={employeeName} onChange={(event) => setEmployeeName(event.target.value)} placeholder="Exact Employee Master name" />
+          <Input
+            value={employeeName}
+            onChange={(event) => setEmployeeName(event.target.value)}
+            placeholder="Exact Employee Master name"
+          />
         </label>
         <Button type="submit" variant="gold" disabled={saving}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
@@ -108,7 +129,12 @@ export function AdminAccessPanel() {
       <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border/70 p-3">
         <label className="min-w-[260px] flex-1 space-y-1.5 text-xs text-muted-foreground">
           Force-confirm account email
-          <Input type="email" value={confirmEmail} onChange={(event) => setConfirmEmail(event.target.value)} placeholder="adey020@gmail.com" />
+          <Input
+            type="email"
+            value={confirmEmail}
+            onChange={(event) => setConfirmEmail(event.target.value)}
+            placeholder="adey020@gmail.com"
+          />
         </label>
         <Button
           type="button"
@@ -122,7 +148,9 @@ export function AdminAccessPanel() {
               toast.success("Account activated", { description: `${normalized} can now sign in.` });
               setConfirmEmail("");
             } catch (error) {
-              toast.error("Could not activate account", { description: error instanceof Error ? error.message : "Unknown error" });
+              toast.error("Could not activate account", {
+                description: error instanceof Error ? error.message : "Unknown error",
+              });
             } finally {
               setConfirmingEmail(null);
             }
@@ -132,8 +160,14 @@ export function AdminAccessPanel() {
         </Button>
       </div>
 
-      {users.isLoading ? <p className="text-xs text-muted-foreground">Loading access list…</p> : null}
-      {users.error ? <p className="text-xs text-danger">{users.error instanceof Error ? users.error.message : "Could not load access list."}</p> : null}
+      {users.isLoading ? (
+        <p className="text-xs text-muted-foreground">Loading access list…</p>
+      ) : null}
+      {users.error ? (
+        <p className="text-xs text-danger">
+          {users.error instanceof Error ? users.error.message : "Could not load access list."}
+        </p>
+      ) : null}
       {users.data?.length ? (
         <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full min-w-[680px] text-left text-xs">
@@ -150,7 +184,9 @@ export function AdminAccessPanel() {
                 <tr key={user.id} className="border-t border-border/70">
                   <td className="px-3 py-2 font-medium">{user.email}</td>
                   <td className="px-3 py-2 text-primary">{ROLE_LABEL[user.role] ?? user.role}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{user.employeeName || user.employeeId || "—"}</td>
+                  <td className="px-3 py-2 text-muted-foreground">
+                    {user.employeeName || user.employeeId || "—"}
+                  </td>
                   <td className="px-3 py-2 text-muted-foreground">
                     <Button
                       type="button"
@@ -161,9 +197,13 @@ export function AdminAccessPanel() {
                         setConfirmingEmail(user.email);
                         try {
                           await confirmUser({ data: { email: user.email } });
-                          toast.success("Account activated", { description: `${user.email} can now sign in.` });
+                          toast.success("Account activated", {
+                            description: `${user.email} can now sign in.`,
+                          });
                         } catch (error) {
-                          toast.error("Could not activate account", { description: error instanceof Error ? error.message : "Unknown error" });
+                          toast.error("Could not activate account", {
+                            description: error instanceof Error ? error.message : "Unknown error",
+                          });
                         } finally {
                           setConfirmingEmail(null);
                         }

@@ -142,7 +142,7 @@ function AuthPage() {
             Decor<span className="text-gold-gradient">lab</span> HR
           </h1>
           <p className="mt-1 text-xs text-muted-foreground">
-            Restricted to leadership. Access is limited to approved email addresses.
+            Account creation is open. Admin or employee-record access is assigned separately.
           </p>
         </div>
         <form onSubmit={onSubmit} className="space-y-4">
@@ -185,9 +185,9 @@ function AuthPage() {
           </button>
         ) : (
           <p className="mt-3 text-center text-xs text-muted-foreground">
-            Ask the administrator to add your email to the access list before creating an account.
-            After signup, confirm the email before signing in. Supabase&apos;s shared email service
-            can be rate-limited; if that appears, contact the administrator instead of retrying.
+            You can create an account and sign in immediately. New accounts start with a default
+            employee view; contact the administrator if you need an employee record or manager/admin
+            access.
           </p>
         )}
         <button

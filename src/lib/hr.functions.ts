@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { AccessUser, ControlRow, DashboardView, ViewerRole } from "./hr-types";
+import { isOpenSignupEnabled } from "./access-policy";
 
 const CONTROL_RANGE = "Control!A:H";
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -21,9 +22,14 @@ function configuredProfile(email: string): AccessProfile | null {
 
   try {
     const profiles = JSON.parse(process.env.ACCESS_PROFILES_JSON ?? "{}").profiles ?? {};
-    const profile = profiles[email] ?? (["adey020@gmail.com", "mundigenius@gmail.com"].includes(email) ? { role: "manager" } : null);
+    const profile =
+      profiles[email] ??
+      (["adey020@gmail.com", "mundigenius@gmail.com"].includes(email) ? { role: "manager" } : null);
     if (!profile) return null;
-    const role = profile.role === "admin" || profile.role === "manager" || profile.role === "employee" ? profile.role : null;
+    const role =
+      profile.role === "admin" || profile.role === "manager" || profile.role === "employee"
+        ? profile.role
+        : null;
     if (!role) return null;
     return {
       role,
@@ -35,10 +41,12 @@ function configuredProfile(email: string): AccessProfile | null {
   }
 }
 
-async function assertAllowed(context: {
-  supabase: any;
-  claims: any;
-}): Promise<{ email: string; role: ViewerRole; employeeId: string | null; employeeName: string | null }> {
+async function assertAllowed(context: { supabase: any; claims: any }): Promise<{
+  email: string;
+  role: ViewerRole;
+  employeeId: string | null;
+  employeeName: string | null;
+}> {
   const email = (context.claims?.email ?? "").toString().toLowerCase();
   if (!email) throw new Error("No email on this account.");
   const configured = configuredProfile(email);
@@ -58,10 +66,28 @@ async function assertAllowed(context: {
       .ilike("email", email)
       .maybeSingle());
   }
+  if (error && isOpenSignupEnabled()) {
+    return { email, role: "employee", employeeId: null, employeeName: null };
+  }
   if (error) throw new Error(error.message);
-  if (!data) throw new Error("Your account is not on the Decorlab HR access list.");
-  const role = data.role === "leadership" || data.role === "admin" ? "admin" : data.role === "manager" ? "manager" : "employee";
-  return { email, role, employeeId: data.employee_id ?? null, employeeName: data.employee_name ?? null };
+  if (!data) {
+    if (isOpenSignupEnabled()) {
+      return { email, role: "employee", employeeId: null, employeeName: null };
+    }
+    throw new Error("Your account is not on the Decorlab HR access list.");
+  }
+  const role =
+    data.role === "leadership" || data.role === "admin"
+      ? "admin"
+      : data.role === "manager"
+        ? "manager"
+        : "employee";
+  return {
+    email,
+    role,
+    employeeId: data.employee_id ?? null,
+    employeeName: data.employee_name ?? null,
+  };
 }
 
 async function assertAdmin(context: { supabase: any; claims: any }): Promise<string> {
@@ -86,10 +112,12 @@ export const getDashboard = createServerFn({ method: "GET" })
     const { loadDashboard } = await import("./hr.server");
     const data = await loadDashboard();
     if (role === "manager") {
-      const own = data.employees.find((e) =>
-        (employeeId && e.id === employeeId) ||
-        (employeeName && e.name.toLowerCase() === employeeName.toLowerCase()),
-      ) ?? null;
+      const own =
+        data.employees.find(
+          (e) =>
+            (employeeId && e.id === employeeId) ||
+            (employeeName && e.name.toLowerCase() === employeeName.toLowerCase()),
+        ) ?? null;
       return {
         viewerRole: "manager",
         month: data.month,
@@ -104,10 +132,12 @@ export const getDashboard = createServerFn({ method: "GET" })
       };
     }
     if (role === "employee") {
-      const employee = data.employees.find((e) =>
-        (employeeId && e.id === employeeId) ||
-        (employeeName && e.name.toLowerCase() === employeeName.toLowerCase()),
-      ) ?? null;
+      const employee =
+        data.employees.find(
+          (e) =>
+            (employeeId && e.id === employeeId) ||
+            (employeeName && e.name.toLowerCase() === employeeName.toLowerCase()),
+        ) ?? null;
       return { viewerRole: "employee", month: data.month, employee };
     }
     return { viewerRole: "admin", data };
@@ -143,17 +173,21 @@ export const listAccessUsers = createServerFn({ method: "GET" })
 
 export const saveAccessUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { email: string; role: ViewerRole; employeeId?: string; employeeName?: string }) => {
-    const email = (input?.email ?? "").trim().toLowerCase();
-    if (!email || !email.includes("@") || email.length > 200) throw new Error("Enter a valid email.");
-    if (!["admin", "manager", "employee"].includes(input.role)) throw new Error("Choose a valid role.");
-    return {
-      email,
-      role: input.role,
-      employeeId: input.employeeId?.trim() || null,
-      employeeName: input.employeeName?.trim() || null,
-    };
-  })
+  .inputValidator(
+    (input: { email: string; role: ViewerRole; employeeId?: string; employeeName?: string }) => {
+      const email = (input?.email ?? "").trim().toLowerCase();
+      if (!email || !email.includes("@") || email.length > 200)
+        throw new Error("Enter a valid email.");
+      if (!["admin", "manager", "employee"].includes(input.role))
+        throw new Error("Choose a valid role.");
+      return {
+        email,
+        role: input.role,
+        employeeId: input.employeeId?.trim() || null,
+        employeeName: input.employeeName?.trim() || null,
+      };
+    },
+  )
   .handler(async ({ data, context }): Promise<AccessUser> => {
     await assertAdmin(context as never);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -194,17 +228,23 @@ export const forceConfirmUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { email: string }) => {
     const email = (input?.email ?? "").trim().toLowerCase();
-    if (!email || !email.includes("@") || email.length > 200) throw new Error("Enter a valid email.");
+    if (!email || !email.includes("@") || email.length > 200)
+      throw new Error("Enter a valid email.");
     return { email };
   })
   .handler(async ({ data, context }): Promise<{ email: string; confirmed: boolean }> => {
     await assertAdmin(context as never);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
     if (listError) throw new Error(listError.message);
     const user = users.users.find((candidate) => candidate.email?.toLowerCase() === data.email);
     if (!user) throw new Error("No account exists for this email yet.");
-    const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, { email_confirm: true });
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+      email_confirm: true,
+    });
     if (error) throw new Error(error.message);
     return { email: data.email, confirmed: true };
   });
