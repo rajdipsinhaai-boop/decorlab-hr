@@ -34,10 +34,11 @@ export const Route = createFileRoute("/api/director-rating-details")({
         try {
           const apiContext = context as unknown as ApiContext;
           await assertAdmin(apiContext);
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const month = new URL(request.url).searchParams.get("month")?.trim();
           if (!month)
             return Response.json({ message: "A review month is required." }, { status: 400 });
-          const { data, error } = await apiContext.supabase
+          const { data, error } = await supabaseAdmin
             .from("monthly_director_rating_details")
             .select(
               "id, review_month, employee_id, employee_name, role, kra_parameter, weight, rating_1_to_5, weighted_score, source_tab, notes, updated_at",
@@ -63,6 +64,7 @@ export const Route = createFileRoute("/api/director-rating-details")({
         try {
           const apiContext = context as unknown as ApiContext;
           await assertAdmin(apiContext);
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const body = (await request.json()) as {
             reviewMonth?: unknown;
             employeeId?: unknown;
@@ -106,7 +108,7 @@ export const Route = createFileRoute("/api/director-rating-details")({
           if (weightedScore !== null && !Number.isFinite(weightedScore)) {
             return Response.json({ message: "Weighted score must be numeric." }, { status: 400 });
           }
-          const { data, error } = await apiContext.supabase
+          const { data, error } = await supabaseAdmin
             .from("monthly_director_rating_details")
             .upsert(
               {
