@@ -17,6 +17,7 @@ import { UploadAttendanceCard } from "@/components/dashboard/UploadAttendanceCar
 import { UploadWhatsAppCard } from "@/components/dashboard/UploadWhatsAppCard";
 import { AskTeamChat } from "@/components/dashboard/AskTeamChat";
 import { AdminAccessPanel } from "@/components/dashboard/AdminAccessPanel";
+import { DirectorRatingsPanel } from "@/components/dashboard/DirectorRatingsPanel";
 import decorlabLogo from "@/assets/decorlab-logo.png";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -153,6 +154,9 @@ function DashboardPage() {
       ) : null}
 
       {view?.viewerRole === "admin" ? <AdminAccessPanel /> : null}
+      {view?.viewerRole === "admin" ? (
+        <DirectorRatingsPanel employees={view.data.employees} selectedMonth={selectedMonth} />
+      ) : null}
 
       {isLoading ? (
         <div className="space-y-4">

@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as ApiDashboardRouteImport } from './routes/api/dashboard'
+import { Route as ApiDirectorRatingsRouteImport } from './routes/api/director-ratings'
 import { Route as ApiReportCardRouteImport } from './routes/api/report-card'
 import { Route as ApiPublicCronProcessQueueRouteImport } from './routes/api/public/cron/process-queue'
 
@@ -41,6 +42,11 @@ const ApiDashboardRoute = ApiDashboardRouteImport.update({
   path: '/api/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDirectorRatingsRoute = ApiDirectorRatingsRouteImport.update({
+  id: '/api/director-ratings',
+  path: '/api/director-ratings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiReportCardRoute = ApiReportCardRouteImport.update({
   id: '/api/report-card',
   path: '/api/report-card',
@@ -58,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/api/dashboard': typeof ApiDashboardRoute
+  '/api/director-ratings': typeof ApiDirectorRatingsRoute
   '/api/report-card': typeof ApiReportCardRoute
   '/api/public/cron/process-queue': typeof ApiPublicCronProcessQueueRoute
 }
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/api/dashboard': typeof ApiDashboardRoute
+  '/api/director-ratings': typeof ApiDirectorRatingsRoute
   '/api/report-card': typeof ApiReportCardRoute
   '/api/public/cron/process-queue': typeof ApiPublicCronProcessQueueRoute
 }
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/api/dashboard': typeof ApiDashboardRoute
+  '/api/director-ratings': typeof ApiDirectorRatingsRoute
   '/api/report-card': typeof ApiReportCardRoute
   '/api/public/cron/process-queue': typeof ApiPublicCronProcessQueueRoute
 }
@@ -86,6 +95,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/api/dashboard'
+    | '/api/director-ratings'
     | '/api/report-card'
     | '/api/public/cron/process-queue'
   fileRoutesByTo: FileRoutesByTo
@@ -94,6 +104,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/api/dashboard'
+    | '/api/director-ratings'
     | '/api/report-card'
     | '/api/public/cron/process-queue'
   id:
@@ -103,6 +114,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/dashboard'
     | '/api/dashboard'
+    | '/api/director-ratings'
     | '/api/report-card'
     | '/api/public/cron/process-queue'
   fileRoutesById: FileRoutesById
@@ -112,6 +124,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ApiDashboardRoute: typeof ApiDashboardRoute
+  ApiDirectorRatingsRoute: typeof ApiDirectorRatingsRoute
   ApiReportCardRoute: typeof ApiReportCardRoute
   ApiPublicCronProcessQueueRoute: typeof ApiPublicCronProcessQueueRoute
 }
@@ -153,6 +166,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/director-ratings': {
+      id: '/api/director-ratings'
+      path: '/api/director-ratings'
+      fullPath: '/api/director-ratings'
+      preLoaderRoute: typeof ApiDirectorRatingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/report-card': {
       id: '/api/report-card'
       path: '/api/report-card'
@@ -186,6 +206,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ApiDashboardRoute: ApiDashboardRoute,
+  ApiDirectorRatingsRoute: ApiDirectorRatingsRoute,
   ApiReportCardRoute: ApiReportCardRoute,
   ApiPublicCronProcessQueueRoute: ApiPublicCronProcessQueueRoute,
 }
