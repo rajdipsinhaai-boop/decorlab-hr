@@ -35,6 +35,60 @@ export type Database = {
         };
         Relationships: [];
       };
+      monthly_director_rating_details: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          employee_id: string;
+          employee_name: string;
+          id: string;
+          kra_parameter: string;
+          notes: string | null;
+          rating_1_to_5: number;
+          review_month: string;
+          role: string;
+          source_tab: string;
+          updated_at: string;
+          updated_by: string | null;
+          weight: number | null;
+          weighted_score: number | null;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          employee_id: string;
+          employee_name: string;
+          id?: string;
+          kra_parameter: string;
+          notes?: string | null;
+          rating_1_to_5: number;
+          review_month: string;
+          role?: string;
+          source_tab?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          weight?: number | null;
+          weighted_score?: number | null;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          employee_id?: string;
+          employee_name?: string;
+          id?: string;
+          kra_parameter?: string;
+          notes?: string | null;
+          rating_1_to_5?: number;
+          review_month?: string;
+          role?: string;
+          source_tab?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          weight?: number | null;
+          weighted_score?: number | null;
+        };
+        Relationships: [];
+      };
       monthly_director_ratings: {
         Row: {
           created_at: string;

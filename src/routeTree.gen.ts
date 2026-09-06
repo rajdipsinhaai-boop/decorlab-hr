@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as ApiDashboardRouteImport } from './routes/api/dashboard'
+import { Route as ApiDirectorRatingDetailsRouteImport } from './routes/api/director-rating-details'
 import { Route as ApiDirectorRatingsRouteImport } from './routes/api/director-ratings'
 import { Route as ApiReportCardRouteImport } from './routes/api/report-card'
 import { Route as ApiPublicCronProcessQueueRouteImport } from './routes/api/public/cron/process-queue'
@@ -42,6 +43,12 @@ const ApiDashboardRoute = ApiDashboardRouteImport.update({
   path: '/api/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDirectorRatingDetailsRoute =
+  ApiDirectorRatingDetailsRouteImport.update({
+    id: '/api/director-rating-details',
+    path: '/api/director-rating-details',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiDirectorRatingsRoute = ApiDirectorRatingsRouteImport.update({
   id: '/api/director-ratings',
   path: '/api/director-ratings',
@@ -64,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/api/dashboard': typeof ApiDashboardRoute
+  '/api/director-rating-details': typeof ApiDirectorRatingDetailsRoute
   '/api/director-ratings': typeof ApiDirectorRatingsRoute
   '/api/report-card': typeof ApiReportCardRoute
   '/api/public/cron/process-queue': typeof ApiPublicCronProcessQueueRoute
@@ -73,6 +81,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/api/dashboard': typeof ApiDashboardRoute
+  '/api/director-rating-details': typeof ApiDirectorRatingDetailsRoute
   '/api/director-ratings': typeof ApiDirectorRatingsRoute
   '/api/report-card': typeof ApiReportCardRoute
   '/api/public/cron/process-queue': typeof ApiPublicCronProcessQueueRoute
@@ -84,6 +93,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/api/dashboard': typeof ApiDashboardRoute
+  '/api/director-rating-details': typeof ApiDirectorRatingDetailsRoute
   '/api/director-ratings': typeof ApiDirectorRatingsRoute
   '/api/report-card': typeof ApiReportCardRoute
   '/api/public/cron/process-queue': typeof ApiPublicCronProcessQueueRoute
@@ -95,6 +105,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/api/dashboard'
+    | '/api/director-rating-details'
     | '/api/director-ratings'
     | '/api/report-card'
     | '/api/public/cron/process-queue'
@@ -104,6 +115,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/api/dashboard'
+    | '/api/director-rating-details'
     | '/api/director-ratings'
     | '/api/report-card'
     | '/api/public/cron/process-queue'
@@ -114,6 +126,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/dashboard'
     | '/api/dashboard'
+    | '/api/director-rating-details'
     | '/api/director-ratings'
     | '/api/report-card'
     | '/api/public/cron/process-queue'
@@ -124,6 +137,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ApiDashboardRoute: typeof ApiDashboardRoute
+  ApiDirectorRatingDetailsRoute: typeof ApiDirectorRatingDetailsRoute
   ApiDirectorRatingsRoute: typeof ApiDirectorRatingsRoute
   ApiReportCardRoute: typeof ApiReportCardRoute
   ApiPublicCronProcessQueueRoute: typeof ApiPublicCronProcessQueueRoute
@@ -166,6 +180,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/director-rating-details': {
+      id: '/api/director-rating-details'
+      path: '/api/director-rating-details'
+      fullPath: '/api/director-rating-details'
+      preLoaderRoute: typeof ApiDirectorRatingDetailsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/director-ratings': {
       id: '/api/director-ratings'
       path: '/api/director-ratings'
@@ -206,6 +227,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ApiDashboardRoute: ApiDashboardRoute,
+  ApiDirectorRatingDetailsRoute: ApiDirectorRatingDetailsRoute,
   ApiDirectorRatingsRoute: ApiDirectorRatingsRoute,
   ApiReportCardRoute: ApiReportCardRoute,
   ApiPublicCronProcessQueueRoute: ApiPublicCronProcessQueueRoute,

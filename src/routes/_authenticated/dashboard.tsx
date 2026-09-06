@@ -154,9 +154,7 @@ function DashboardPage() {
       ) : null}
 
       {view?.viewerRole === "admin" ? <AdminAccessPanel /> : null}
-      {view?.viewerRole === "admin" ? (
-        <DirectorRatingsPanel employees={view.data.employees} selectedMonth={selectedMonth} />
-      ) : null}
+      {view?.viewerRole === "admin" ? <DirectorRatingsPanel selectedMonth={selectedMonth} /> : null}
 
       {isLoading ? (
         <div className="space-y-4">
