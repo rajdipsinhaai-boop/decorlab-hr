@@ -27,6 +27,8 @@ type ReportCardSnapshot = {
 };
 
 const REPORT_CARDS = reportCards as Record<string, ReportCardSnapshot>;
+const REPORT_MONTHS = ["July 2026", "August 2026"] as const;
+const DEFAULT_REPORT_MONTH = REPORT_MONTHS[0];
 
 type Grid = string[][];
 
@@ -139,7 +141,11 @@ function buildBreakdown(group: RoleGroup, rec: KraRecord | undefined): Breakdown
 
   if (group === "supervisor") {
     return [
-      seg("Attendance (discipline-adjusted)", 30, totalNum(rec, "attendance score (discipline", "attendance score")),
+      seg(
+        "Attendance (discipline-adjusted)",
+        30,
+        totalNum(rec, "attendance score (discipline", "attendance score"),
+      ),
       seg("DPR Combined", 50, totalNum(rec, "dpr combined")),
       seg("System Work Feedback", 20, managerRating),
     ];
@@ -170,7 +176,10 @@ function reportCardNarrative(
   const scoreBuilt = snapshot.scoreBuilt.length
     ? snapshot.scoreBuilt
     : [
-        ...breakdown.map((segment) => `${segment.label} (weight ${segment.weight}%) ${segment.score}% → ${segment.contribution} pts.`),
+        ...breakdown.map(
+          (segment) =>
+            `${segment.label} (weight ${segment.weight}%) ${segment.score}% → ${segment.contribution} pts.`,
+        ),
         `Final score: ${score}% (${rag}) for ${month}.`,
       ];
   const whyScore = snapshot.whyScore.length
@@ -239,7 +248,8 @@ async function loadActivityLogs(month: string): Promise<ActivityBundle> {
       const name = cell(row, i.name);
       if (!name || !inMonth(row, i.month)) continue;
       const summary = cell(row, i.summary);
-      const isSummary = /^summary$/i.test(cell(row, i.date)) || /^summary/i.test(cell(row, i.grade));
+      const isSummary =
+        /^summary$/i.test(cell(row, i.date)) || /^summary/i.test(cell(row, i.grade));
       if (isSummary) {
         const pct = /(\d+(\.\d+)?)\s*%?/.exec(`${summary} ${cell(row, i.blockers)}`.trim());
         if (pct) out.filing[name] = Math.round(parseFloat(pct[1]!));
@@ -284,7 +294,10 @@ async function loadActivityLogs(month: string): Promise<ActivityBundle> {
   return out;
 }
 
-export async function loadDashboard(): Promise<DashboardData> {
+export async function loadDashboard(requestedMonth = DEFAULT_REPORT_MONTH): Promise<DashboardData> {
+  const month = REPORT_MONTHS.includes(requestedMonth as (typeof REPORT_MONTHS)[number])
+    ? requestedMonth
+    : DEFAULT_REPORT_MONTH;
   const ranges = [
     "Monthly Summary!A2:B2",
     "Employee Master!A3:I200",
@@ -295,21 +308,25 @@ export async function loadDashboard(): Promise<DashboardData> {
     "Daily Attendance!A3:I5000",
   ];
   let data: Record<string, string[][]>;
-  try {
-    data = await batchGet(ranges);
-  } catch (error) {
-    console.warn("Google Sheets unavailable; using the attached workbook fallback.", error);
-    data = fallbackBatchGet(ranges);
+  if (month === "August 2026") {
+    data = fallbackBatchGet(ranges, month);
+  } else {
+    try {
+      data = await batchGet(ranges);
+    } catch (error) {
+      console.warn("Google Sheets unavailable; using the attached workbook fallback.", error);
+      data = fallbackBatchGet(ranges, month);
+    }
   }
 
-  const month = reviewMonth(data[ranges[0]!] ?? []) || "Current period";
+  const loadedMonth = reviewMonth(data[ranges[0]!] ?? []) || month || "Current period";
   const master = data[ranges[1]!] ?? [];
   const summary = data[ranges[2]!] ?? [];
   const supervisor = parseKraTab(data[ranges[3]!] ?? []);
   const designer = parseKraTab(data[ranges[4]!] ?? []);
   const ea = parseKraTab(data[ranges[5]!] ?? []);
   const attendance = data[ranges[6]!] ?? [];
-  const activity = await loadActivityLogs(month);
+  const activity = await loadActivityLogs(loadedMonth);
 
   // Employee master
   const mHeaders = master[0] ?? [];
@@ -374,7 +391,8 @@ export async function loadDashboard(): Promise<DashboardData> {
     if (mi.status >= 0 && cell(row, mi.status).toLowerCase() === "inactive") continue;
     const role = cell(row, mi.role);
     const group = roleGroupOf(role);
-    const rec = group === "supervisor" ? supervisor[name] : group === "designer" ? designer[name] : ea[name];
+    const rec =
+      group === "supervisor" ? supervisor[name] : group === "designer" ? designer[name] : ea[name];
     const sRow = summaryByName[name];
 
     const score = sRow ? num(cell(sRow, si.score)) : totalNum(rec, "final kra");
@@ -391,8 +409,16 @@ export async function loadDashboard(): Promise<DashboardData> {
       .map((m) => m - SCHEDULED_START_MINUTES);
     const hoursList = present.map((d) => d.hours).filter((h) => h > 0);
 
-    const reportCard = REPORT_CARDS[name.toLowerCase()];
-    const reportNarrative = reportCardNarrative(reportCard, buildBreakdown(group, rec), Math.round(score * 10) / 10, rag, month, present.length, days.filter((d) => /absent/i.test(d.status)).length);
+    const reportCard = loadedMonth === "July 2026" ? REPORT_CARDS[name.toLowerCase()] : undefined;
+    const reportNarrative = reportCardNarrative(
+      reportCard,
+      buildBreakdown(group, rec),
+      Math.round(score * 10) / 10,
+      rag,
+      loadedMonth,
+      present.length,
+      days.filter((d) => /absent/i.test(d.status)).length,
+    );
 
     employees.push({
       id: cell(row, mi.id) || name,
@@ -412,7 +438,9 @@ export async function loadDashboard(): Promise<DashboardData> {
       note: rec?.note ?? "",
       presentDays: present.length,
       absentDays: days.filter((d) => /absent/i.test(d.status)).length,
-      avgHours: hoursList.length ? Math.round((hoursList.reduce((a, b) => a + b, 0) / hoursList.length) * 10) / 10 : 0,
+      avgHours: hoursList.length
+        ? Math.round((hoursList.reduce((a, b) => a + b, 0) / hoursList.length) * 10) / 10
+        : 0,
       punctualityDeviation: deviations.length
         ? Math.round(deviations.reduce((a, b) => a + b, 0) / deviations.length)
         : 0,
@@ -420,19 +448,20 @@ export async function loadDashboard(): Promise<DashboardData> {
       filingDiscipline: activity.filing[name] ?? null,
       dprActivity: activity.dpr[name] ?? [],
       taskActivity: activity.task[name] ?? [],
-      reportCard: reportCard && reportNarrative
-        ? {
-            month: reportCard.month,
-            ...reportNarrative,
-            downloadPath: `/api/report-card?name=${encodeURIComponent(name)}`,
-          }
-        : undefined,
+      reportCard:
+        reportCard && reportNarrative
+          ? {
+              month: reportCard.month,
+              ...reportNarrative,
+              downloadPath: `/api/report-card?name=${encodeURIComponent(name)}`,
+            }
+          : undefined,
     });
   }
 
   return {
-    month,
-    months: month ? [month] : [],
+    month: loadedMonth,
+    months: [...REPORT_MONTHS],
     targetHours: TARGET_HOURS,
     scheduledStart: `${String(Math.floor(SCHEDULED_START_MINUTES / 60)).padStart(2, "0")}:${String(
       SCHEDULED_START_MINUTES % 60,
@@ -454,12 +483,11 @@ export async function loadControlRows(): Promise<ControlRow[]> {
     const requestId = cell(row, 0);
     if (!requestId) return [];
     const rawType = cell(row, 7);
-    const type =
-      rawType.toLowerCase().includes("attendance")
-        ? "Attendance Upload"
-        : rawType.toLowerCase().includes("whatsapp")
-          ? "WhatsApp Export"
-          : "Create Report";
+    const type = rawType.toLowerCase().includes("attendance")
+      ? "Attendance Upload"
+      : rawType.toLowerCase().includes("whatsapp")
+        ? "WhatsApp Export"
+        : "Create Report";
     return [
       {
         requestId,

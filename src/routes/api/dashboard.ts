@@ -83,9 +83,10 @@ export const Route = createFileRoute("/api/dashboard")({
   server: {
     middleware: [requireSupabaseAuth],
     handlers: {
-      GET: async ({ context }) => {
+      GET: async ({ request, context }) => {
         const { role, employeeId, employeeName } = await assertAllowed(context as never);
-        const data = await loadDashboard();
+        const requestedMonth = new URL(request.url).searchParams.get("month") ?? "July 2026";
+        const data = await loadDashboard(requestedMonth);
         if (role === "manager") {
           const own =
             data.employees.find(
