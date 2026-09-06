@@ -1,26 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Save, Star } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
-type RatingDetail = {
-  id: string;
-  review_month: string;
-  employee_id: string;
-  employee_name: string;
-  role: string;
-  kra_parameter: string;
-  weight: number | null;
-  rating_1_to_5: number;
-  weighted_score: number | null;
-  source_tab: string;
-  notes: string | null;
-  updated_at: string;
-};
+import {
+  getDirectorRatingDetails,
+  saveDirectorRatingDetail,
+  type DirectorRatingDetail,
+} from "@/lib/hr.functions";
 
 export function DirectorRatingsPanel({ selectedMonth }: { selectedMonth: string }) {
-  const [details, setDetails] = useState<RatingDetail[]>([]);
+  const loadDetails = useServerFn(getDirectorRatingDetails);
+  const saveDetail = useServerFn(saveDirectorRatingDetail);
+  const [details, setDetails] = useState<DirectorRatingDetail[]>([]);
   const [ratings, setRatings] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -43,13 +36,8 @@ export function DirectorRatingsPanel({ selectedMonth }: { selectedMonth: string 
     setError(null);
     void (async () => {
       try {
-        const response = await fetch(
-          `/api/director-rating-details?month=${encodeURIComponent(selectedMonth)}`,
-        );
-        const payload = await response.json().catch(() => null);
-        if (!response.ok) throw new Error(payload?.message ?? "Could not load Director Ratings.");
+        const rows = await loadDetails({ data: { month: selectedMonth } });
         if (cancelled) return;
-        const rows = (payload?.ratings ?? []) as RatingDetail[];
         const nextRatings: Record<string, string> = {};
         const nextNotes: Record<string, string> = {};
         for (const row of rows) {
@@ -72,9 +60,9 @@ export function DirectorRatingsPanel({ selectedMonth }: { selectedMonth: string 
     return () => {
       cancelled = true;
     };
-  }, [selectedMonth]);
+  }, [loadDetails, selectedMonth]);
 
-  const saveRating = async (row: RatingDetail) => {
+  const saveRating = async (row: DirectorRatingDetail) => {
     const raw = ratings[row.id]?.trim() ?? "";
     const value = Number(raw);
     if (!raw || !Number.isFinite(value) || value < 0 || value > 5) {
@@ -85,10 +73,8 @@ export function DirectorRatingsPanel({ selectedMonth }: { selectedMonth: string 
     }
     setSavingId(row.id);
     try {
-      const response = await fetch("/api/director-rating-details", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const saved = await saveDetail({
+        data: {
           reviewMonth: row.review_month,
           employeeId: row.employee_id,
           employeeName: row.employee_name,
@@ -99,11 +85,8 @@ export function DirectorRatingsPanel({ selectedMonth }: { selectedMonth: string 
           weightedScore: row.weight == null ? row.weighted_score : value * row.weight,
           sourceTab: row.source_tab,
           notes: notes[row.id]?.trim() || null,
-        }),
+        },
       });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.message ?? "Could not save Director Rating.");
-      const saved = payload?.rating as RatingDetail;
       setDetails((current) => current.map((item) => (item.id === row.id ? saved : item)));
       toast.success("Director Rating saved", {
         description: `${row.employee_name} · ${row.kra_parameter}`,

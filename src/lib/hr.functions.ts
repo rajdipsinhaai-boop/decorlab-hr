@@ -406,3 +406,113 @@ export const askAssistant = createServerFn({ method: "POST" })
     const { answerQuestion } = await import("./assistant.server");
     return { answer: await answerQuestion(data.question, data.history) };
   });
+
+export type DirectorRatingDetail = {
+  id: string;
+  review_month: string;
+  employee_id: string;
+  employee_name: string;
+  role: string;
+  kra_parameter: string;
+  weight: number | null;
+  rating_1_to_5: number;
+  weighted_score: number | null;
+  source_tab: string;
+  notes: string | null;
+  updated_at: string;
+};
+
+export const getDirectorRatingDetails = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { month: string }) => {
+    const month = (input?.month ?? "").trim();
+    if (!month || month.length > 60) throw new Error("A valid review month is required.");
+    return { month };
+  })
+  .handler(async ({ data, context }): Promise<DirectorRatingDetail[]> => {
+    await assertAdmin(context as never);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("monthly_director_rating_details")
+      .select(
+        "id, review_month, employee_id, employee_name, role, kra_parameter, weight, rating_1_to_5, weighted_score, source_tab, notes, updated_at",
+      )
+      .eq("review_month", data.month)
+      .order("employee_name", { ascending: true })
+      .order("kra_parameter", { ascending: true });
+    if (error) throw new Error(error.message);
+    return (rows ?? []) as DirectorRatingDetail[];
+  });
+
+export const saveDirectorRatingDetail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (input: {
+      reviewMonth: string;
+      employeeId: string;
+      employeeName: string;
+      role?: string;
+      kraParameter: string;
+      weight?: number | null;
+      rating1To5: number;
+      weightedScore?: number | null;
+      sourceTab?: string;
+      notes?: string | null;
+    }) => {
+      const reviewMonth = (input?.reviewMonth ?? "").trim();
+      const employeeId = (input?.employeeId ?? "").trim();
+      const employeeName = (input?.employeeName ?? "").trim();
+      const kraParameter = (input?.kraParameter ?? "").trim();
+      if (!reviewMonth || !employeeId || !employeeName || !kraParameter) {
+        throw new Error("Review month, employee, employee name, and KRA parameter are required.");
+      }
+      if (!Number.isFinite(input.rating1To5) || input.rating1To5 < 0 || input.rating1To5 > 5) {
+        throw new Error("Rating must be a number from 0 to 5.");
+      }
+      if (input.weight != null && !Number.isFinite(input.weight))
+        throw new Error("Weight must be numeric.");
+      if (input.weightedScore != null && !Number.isFinite(input.weightedScore)) {
+        throw new Error("Weighted score must be numeric.");
+      }
+      return {
+        reviewMonth,
+        employeeId,
+        employeeName,
+        role: (input.role ?? "").trim(),
+        kraParameter,
+        weight: input.weight ?? null,
+        rating1To5: Math.round(input.rating1To5 * 100) / 100,
+        weightedScore: input.weightedScore ?? null,
+        sourceTab: (input.sourceTab ?? "").trim(),
+        notes: input.notes?.trim() || null,
+      };
+    },
+  )
+  .handler(async ({ data, context }): Promise<DirectorRatingDetail> => {
+    await assertAdmin(context as never);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
+      .from("monthly_director_rating_details")
+      .upsert(
+        {
+          review_month: data.reviewMonth,
+          employee_id: data.employeeId,
+          employee_name: data.employeeName,
+          role: data.role,
+          kra_parameter: data.kraParameter,
+          weight: data.weight,
+          rating_1_to_5: data.rating1To5,
+          weighted_score: data.weightedScore,
+          source_tab: data.sourceTab,
+          notes: data.notes,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "review_month,employee_id,kra_parameter" },
+      )
+      .select(
+        "id, review_month, employee_id, employee_name, role, kra_parameter, weight, rating_1_to_5, weighted_score, source_tab, notes, updated_at",
+      )
+      .single();
+    if (error) throw new Error(error.message);
+    return row as DirectorRatingDetail;
+  });
