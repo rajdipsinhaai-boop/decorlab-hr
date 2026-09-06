@@ -3,35 +3,38 @@ import { Loader2, Save, Star } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { Employee } from "@/lib/hr-types";
-import { supabase } from "@/integrations/supabase/client";
 
-type DirectorRating = {
+type RatingDetail = {
   id: string;
   review_month: string;
   employee_id: string;
   employee_name: string;
-  director_rating: number;
+  role: string;
+  kra_parameter: string;
+  weight: number | null;
+  rating_1_to_5: number;
+  weighted_score: number | null;
+  source_tab: string;
   notes: string | null;
   updated_at: string;
 };
 
-export function DirectorRatingsPanel({
-  employees,
-  selectedMonth,
-}: {
-  employees: Employee[];
-  selectedMonth: string;
-}) {
+export function DirectorRatingsPanel({ selectedMonth }: { selectedMonth: string }) {
+  const [details, setDetails] = useState<RatingDetail[]>([]);
   const [ratings, setRatings] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const sortedEmployees = useMemo(
-    () => [...employees].sort((a, b) => a.name.localeCompare(b.name)),
-    [employees],
+  const sortedDetails = useMemo(
+    () =>
+      [...details].sort(
+        (a, b) =>
+          a.employee_name.localeCompare(b.employee_name) ||
+          a.kra_parameter.localeCompare(b.kra_parameter),
+      ),
+    [details],
   );
 
   useEffect(() => {
@@ -40,22 +43,20 @@ export function DirectorRatingsPanel({
     setError(null);
     void (async () => {
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData.session?.access_token;
-        if (!token) throw new Error("Your session has expired. Please sign in again.");
         const response = await fetch(
-          `/api/director-ratings?month=${encodeURIComponent(selectedMonth)}`,
-          { headers: { Authorization: `Bearer ${token}` } },
+          `/api/director-rating-details?month=${encodeURIComponent(selectedMonth)}`,
         );
         const payload = await response.json().catch(() => null);
         if (!response.ok) throw new Error(payload?.message ?? "Could not load Director Ratings.");
         if (cancelled) return;
+        const rows = (payload?.ratings ?? []) as RatingDetail[];
         const nextRatings: Record<string, string> = {};
         const nextNotes: Record<string, string> = {};
-        for (const rating of (payload?.ratings ?? []) as DirectorRating[]) {
-          nextRatings[rating.employee_id] = String(rating.director_rating);
-          nextNotes[rating.employee_id] = rating.notes ?? "";
+        for (const row of rows) {
+          nextRatings[row.id] = String(row.rating_1_to_5);
+          nextNotes[row.id] = row.notes ?? "";
         }
+        setDetails(rows);
         setRatings(nextRatings);
         setNotes(nextNotes);
       } catch (loadError) {
@@ -73,33 +74,39 @@ export function DirectorRatingsPanel({
     };
   }, [selectedMonth]);
 
-  const saveRating = async (employee: Employee) => {
-    const raw = ratings[employee.id]?.trim() ?? "";
+  const saveRating = async (row: RatingDetail) => {
+    const raw = ratings[row.id]?.trim() ?? "";
     const value = Number(raw);
-    if (!raw || !Number.isFinite(value) || value < 0 || value > 100) {
-      toast.error("Enter a Director Rating from 0 to 100", { description: employee.name });
+    if (!raw || !Number.isFinite(value) || value < 0 || value > 5) {
+      toast.error("Enter a rating from 0 to 5", {
+        description: `${row.employee_name} · ${row.kra_parameter}`,
+      });
       return;
     }
-    setSavingId(employee.id);
+    setSavingId(row.id);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      if (!token) throw new Error("Your session has expired. Please sign in again.");
-      const response = await fetch("/api/director-ratings", {
+      const response = await fetch("/api/director-rating-details", {
         method: "PUT",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          reviewMonth: selectedMonth,
-          employeeId: employee.id,
-          employeeName: employee.name,
-          directorRating: value,
-          notes: notes[employee.id]?.trim() || null,
+          reviewMonth: row.review_month,
+          employeeId: row.employee_id,
+          employeeName: row.employee_name,
+          role: row.role,
+          kraParameter: row.kra_parameter,
+          weight: row.weight,
+          rating1To5: value,
+          weightedScore: row.weight == null ? row.weighted_score : value * row.weight,
+          sourceTab: row.source_tab,
+          notes: notes[row.id]?.trim() || null,
         }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.message ?? "Could not save Director Rating.");
+      const saved = payload?.rating as RatingDetail;
+      setDetails((current) => current.map((item) => (item.id === row.id ? saved : item)));
       toast.success("Director Rating saved", {
-        description: `${employee.name} · ${selectedMonth}`,
+        description: `${row.employee_name} · ${row.kra_parameter}`,
       });
     } catch (saveError) {
       toast.error("Could not save Director Rating", {
@@ -118,11 +125,12 @@ export function DirectorRatingsPanel({
         </span>
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">
-            Director Ratings
+            Director Ratings by KRA Area
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Store the director’s monthly rating separately for each employee. These values are saved
-            to Supabase and are not used in the current score calculation yet.
+            These are the detailed 0–5 ratings entered in the KRA sheets for each employee and
+            scoring area. They are stored in Supabase and are not used in the current score
+            calculation yet.
           </p>
         </div>
       </div>
@@ -132,50 +140,66 @@ export function DirectorRatingsPanel({
           <p className="text-xs font-medium text-foreground">Editing month</p>
           <p className="mt-1 text-xs text-muted-foreground">{selectedMonth}</p>
         </div>
-        <p className="text-xs text-muted-foreground">Allowed range: 0–100</p>
+        <p className="text-xs text-muted-foreground">
+          Rating scale: 0–5 · source values imported from the KRA sheets
+        </p>
       </div>
 
       {loading ? <p className="text-xs text-muted-foreground">Loading Director Ratings…</p> : null}
       {error ? <p className="text-xs text-danger">{error}</p> : null}
-      {!loading && !error ? (
+      {!loading && !error && !sortedDetails.length ? (
+        <p className="text-xs text-muted-foreground">
+          No detailed ratings are available for this month.
+        </p>
+      ) : null}
+      {!loading && !error && sortedDetails.length ? (
         <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[760px] text-left text-xs">
+          <table className="w-full min-w-[1080px] text-left text-xs">
             <thead className="bg-secondary/60 text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Employee</th>
                 <th className="px-3 py-2 font-medium">Role</th>
-                <th className="w-36 px-3 py-2 font-medium">Director Rating</th>
-                <th className="px-3 py-2 font-medium">Notes</th>
+                <th className="px-3 py-2 font-medium">KRA area</th>
+                <th className="w-24 px-3 py-2 font-medium">Weight</th>
+                <th className="w-32 px-3 py-2 font-medium">Rating 0–5</th>
+                <th className="w-32 px-3 py-2 font-medium">Weighted score</th>
+                <th className="w-56 px-3 py-2 font-medium">Notes</th>
                 <th className="w-28 px-3 py-2 font-medium">Action</th>
               </tr>
             </thead>
             <tbody>
-              {sortedEmployees.map((employee) => (
-                <tr key={employee.id} className="border-t border-border/70">
-                  <td className="px-3 py-2 font-medium">{employee.name}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{employee.role}</td>
+              {sortedDetails.map((row) => (
+                <tr key={row.id} className="border-t border-border/70">
+                  <td className="px-3 py-2 font-medium">{row.employee_name}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{row.role || "—"}</td>
+                  <td className="px-3 py-2">{row.kra_parameter}</td>
+                  <td className="px-3 py-2 text-muted-foreground">
+                    {row.weight == null ? "—" : `${Math.round(row.weight * 100)}%`}
+                  </td>
                   <td className="px-3 py-2">
                     <Input
                       type="number"
                       min="0"
-                      max="100"
+                      max="5"
                       step="0.1"
-                      value={ratings[employee.id] ?? ""}
+                      value={ratings[row.id] ?? ""}
                       onChange={(event) =>
-                        setRatings((current) => ({ ...current, [employee.id]: event.target.value }))
+                        setRatings((current) => ({ ...current, [row.id]: event.target.value }))
                       }
-                      placeholder="Not set"
-                      aria-label={`Director Rating for ${employee.name}`}
+                      aria-label={`Rating for ${row.employee_name} ${row.kra_parameter}`}
                     />
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">
+                    {row.weighted_score == null ? "—" : row.weighted_score}
                   </td>
                   <td className="px-3 py-2">
                     <Input
-                      value={notes[employee.id] ?? ""}
+                      value={notes[row.id] ?? ""}
                       onChange={(event) =>
-                        setNotes((current) => ({ ...current, [employee.id]: event.target.value }))
+                        setNotes((current) => ({ ...current, [row.id]: event.target.value }))
                       }
                       placeholder="Optional note"
-                      aria-label={`Notes for ${employee.name}`}
+                      aria-label={`Notes for ${row.employee_name} ${row.kra_parameter}`}
                     />
                   </td>
                   <td className="px-3 py-2">
@@ -183,10 +207,10 @@ export function DirectorRatingsPanel({
                       type="button"
                       size="sm"
                       variant="gold"
-                      disabled={savingId === employee.id}
-                      onClick={() => void saveRating(employee)}
+                      disabled={savingId === row.id}
+                      onClick={() => void saveRating(row)}
                     >
-                      {savingId === employee.id ? (
+                      {savingId === row.id ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
                         <Save className="h-3.5 w-3.5" />
