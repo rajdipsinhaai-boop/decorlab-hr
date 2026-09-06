@@ -31,7 +31,8 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
       { property: "og:title", content: "Decorlab HR Performance Dashboard" },
       {
         property: "og:description",
-        content: "Live KRA scores, RAG status, attendance and punctuality analytics for the Decorlab team.",
+        content:
+          "Live KRA scores, RAG status, attendance and punctuality analytics for the Decorlab team.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -45,13 +46,20 @@ const ROLE_ORDER = ["supervisor", "designer", "ea"] as const;
 
 function DashboardPage() {
   const navigate = useNavigate();
-  const { data: view, isLoading, error, refetch, isFetching } = useQuery<DashboardView>({
-    queryKey: ["hr-dashboard"],
+  const [selectedMonth, setSelectedMonth] = useState("July 2026");
+  const {
+    data: view,
+    isLoading,
+    error,
+    refetch,
+    isFetching,
+  } = useQuery<DashboardView>({
+    queryKey: ["hr-dashboard", selectedMonth],
     queryFn: async () => {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
       if (!token) throw new Error("Your session has expired. Please sign in again.");
-      const response = await fetch("/api/dashboard", {
+      const response = await fetch(`/api/dashboard?month=${encodeURIComponent(selectedMonth)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const payload = await response.json().catch(() => null);
@@ -70,11 +78,7 @@ function DashboardPage() {
 
   const isManager = view?.viewerRole === "manager";
   const isEmployee = view?.viewerRole === "employee";
-  const month = view
-    ? view.viewerRole === "admin"
-      ? view.data.month
-      : view.month
-    : "—";
+  const month = view ? (view.viewerRole === "admin" ? view.data.month : view.month) : "—";
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8">
@@ -89,11 +93,17 @@ function DashboardPage() {
             <p className="text-[11px] uppercase tracking-[0.3em] text-primary">Decorlab</p>
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
               {isManager ? (
-                <>Manager <span className="text-gold-gradient">View</span></>
+                <>
+                  Manager <span className="text-gold-gradient">View</span>
+                </>
               ) : isEmployee ? (
-                <>My <span className="text-gold-gradient">Report Card</span></>
+                <>
+                  My <span className="text-gold-gradient">Report Card</span>
+                </>
               ) : (
-                <>HR Performance <span className="text-gold-gradient">Dashboard</span></>
+                <>
+                  HR Performance <span className="text-gold-gradient">Dashboard</span>
+                </>
               )}
             </h1>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -108,6 +118,24 @@ function DashboardPage() {
           <Button variant="ghost" size="icon" onClick={signOut} aria-label="Sign out">
             <LogOut className="h-4 w-4" />
           </Button>
+          {view?.viewerRole === "admin" ? (
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="sr-only">Report month</span>
+              <select
+                value={selectedMonth}
+                onChange={(event) => setSelectedMonth(event.target.value)}
+                className="h-9 rounded-md border border-border bg-background px-3 text-xs font-medium text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+              >
+                {(view.data.months.length ? view.data.months : ["July 2026", "August 2026"]).map(
+                  (option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ),
+                )}
+              </select>
+            </label>
+          ) : null}
           {view?.viewerRole === "admin" ? <CreateReportButton month={view.data.month} /> : null}
         </div>
       </header>
@@ -156,7 +184,17 @@ const ROLE_LABEL: Record<string, string> = {
   ea: "Executive assistant",
 };
 
-function ManagerView({ month, months, roster, own }: { month: string; months: string[]; roster: RosterEntry[]; own: Employee | null }) {
+function ManagerView({
+  month,
+  months,
+  roster,
+  own,
+}: {
+  month: string;
+  months: string[];
+  roster: RosterEntry[];
+  own: Employee | null;
+}) {
   const grouped = useMemo(() => {
     return ROLE_ORDER.map((group) => ({
       group,
@@ -173,8 +211,12 @@ function ManagerView({ month, months, roster, own }: { month: string; months: st
 
       {own ? (
         <section className="panel space-y-3 p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">My report card</h2>
-          <p className="text-xs text-muted-foreground">Your manager account can see the whole team roster and your own performance details.</p>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">
+            My report card
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Your manager account can see the whole team roster and your own performance details.
+          </p>
           <ManagerSelfCard employee={own} month={month} />
         </section>
       ) : null}
@@ -209,7 +251,8 @@ function ManagerView({ month, months, roster, own }: { month: string; months: st
           ))}
         </div>
         <p className="mt-4 text-xs text-muted-foreground">
-          Team names and roles are visible to managers. Performance scores are limited to each manager’s own report card and administrators.
+          Team names and roles are visible to managers. Performance scores are limited to each
+          manager’s own report card and administrators.
         </p>
       </section>
 
@@ -223,7 +266,11 @@ function ManagerSelfCard({ employee, month }: { employee: Employee; month: strin
   return (
     <>
       <EmployeeCard employee={employee} onOpen={() => setSelected(employee)} />
-      <EmployeeDetail employee={selected} month={month} onOpenChange={(open) => !open && setSelected(null)} />
+      <EmployeeDetail
+        employee={selected}
+        month={month}
+        onOpenChange={(open) => !open && setSelected(null)}
+      />
     </>
   );
 }
@@ -233,20 +280,29 @@ function EmployeeSelfView({ employee, month }: { employee: Employee | null; mont
   if (!employee) {
     return (
       <div className="panel p-6 text-sm">
-        Your account is approved, but it is not linked to an Employee Master record yet. Ask an administrator to add your Employee ID or exact name.
+        Your account is approved, but it is not linked to an Employee Master record yet. Ask an
+        administrator to add your Employee ID or exact name.
       </div>
     );
   }
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Personal report card</h2>
-        <p className="mt-1 text-xs text-muted-foreground">Only your own performance, attendance, and report-card details are shown.</p>
+        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          Personal report card
+        </h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Only your own performance, attendance, and report-card details are shown.
+        </p>
       </div>
       <div className="max-w-md">
         <EmployeeCard employee={employee} onOpen={() => setSelected(employee)} />
       </div>
-      <EmployeeDetail employee={selected} month={month} onOpenChange={(open) => !open && setSelected(null)} />
+      <EmployeeDetail
+        employee={selected}
+        month={month}
+        onOpenChange={(open) => !open && setSelected(null)}
+      />
     </section>
   );
 }
@@ -291,7 +347,13 @@ function LeadershipView({ data }: { data: DashboardData }) {
                       : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
                   }`}
                 >
-                  {f === "ALL" ? "All" : f === "GREEN" ? "Green ≥75%" : f === "YELLOW" ? "Yellow 60-75%" : "Red <60%"}
+                  {f === "ALL"
+                    ? "All"
+                    : f === "GREEN"
+                      ? "Green ≥75%"
+                      : f === "YELLOW"
+                        ? "Yellow 60-75%"
+                        : "Red <60%"}
                 </button>
               ))}
             </div>
@@ -302,7 +364,9 @@ function LeadershipView({ data }: { data: DashboardData }) {
             ))}
           </div>
           {!employees.length ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">No employees in this bucket.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              No employees in this bucket.
+            </p>
           ) : null}
         </section>
 
