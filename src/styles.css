@@ -179,6 +179,16 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-panel);
+  position: relative;
+}
+
+@utility panel-glass {
+  background: color-mix(in oklch, var(--card) 78%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(14px);
+  position: relative;
 }
 
 @utility text-gold-gradient {
@@ -186,4 +196,16 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+/* Subtle top-of-page ambient glow used behind the sidebar/topbar */
+@utility ambient-glow {
+  background-image:
+    radial-gradient(60% 40% at 15% 0%, oklch(0.742 0.129 87.3 / 0.08), transparent 60%),
+    radial-gradient(50% 35% at 90% 0%, oklch(0.68 0.12 235 / 0.08), transparent 60%);
 }
