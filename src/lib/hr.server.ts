@@ -171,9 +171,8 @@ function reportCardNarrative(
   month: string,
   presentDays: number,
   absentDays: number,
-): { scoreBuilt: string[]; whyScore: string[]; improveNextMonth: string[] } | null {
-  if (!snapshot) return null;
-  const scoreBuilt = snapshot.scoreBuilt.length
+): { scoreBuilt: string[]; whyScore: string[]; improveNextMonth: string[] } {
+  const scoreBuilt = snapshot?.scoreBuilt.length
     ? snapshot.scoreBuilt
     : [
         ...breakdown.map(
@@ -182,13 +181,13 @@ function reportCardNarrative(
         ),
         `Final score: ${score}% (${rag}) for ${month}.`,
       ];
-  const whyScore = snapshot.whyScore.length
+  const whyScore = snapshot?.whyScore.length
     ? snapshot.whyScore
     : [
         `This score is calculated from the weighted sections shown above.`,
         `Attendance record: ${presentDays} present day(s) and ${absentDays} absent day(s).`,
       ];
-  const improveNextMonth = snapshot.improveNextMonth.length
+  const improveNextMonth = snapshot?.improveNextMonth.length
     ? snapshot.improveNextMonth
     : [
         rag === "RED"
@@ -294,10 +293,14 @@ async function loadActivityLogs(month: string): Promise<ActivityBundle> {
   return out;
 }
 
-export async function loadDashboard(requestedMonth = DEFAULT_REPORT_MONTH): Promise<DashboardData> {
-  const month = REPORT_MONTHS.includes(requestedMonth as (typeof REPORT_MONTHS)[number])
-    ? requestedMonth
-    : DEFAULT_REPORT_MONTH;
+export async function loadDashboard(
+  requestedMonth: string = DEFAULT_REPORT_MONTH,
+): Promise<DashboardData> {
+  const month = (
+    REPORT_MONTHS.includes(requestedMonth as (typeof REPORT_MONTHS)[number])
+      ? requestedMonth
+      : DEFAULT_REPORT_MONTH
+  ) as (typeof REPORT_MONTHS)[number];
   const ranges = [
     "Monthly Summary!A2:B2",
     "Employee Master!A3:I200",
@@ -448,14 +451,15 @@ export async function loadDashboard(requestedMonth = DEFAULT_REPORT_MONTH): Prom
       filingDiscipline: activity.filing[name] ?? null,
       dprActivity: activity.dpr[name] ?? [],
       taskActivity: activity.task[name] ?? [],
-      reportCard:
-        reportCard && reportNarrative
-          ? {
-              month: reportCard.month,
+      ...(reportNarrative
+        ? {
+            reportCard: {
+              month: loadedMonth,
               ...reportNarrative,
-              downloadPath: `/api/report-card?name=${encodeURIComponent(name)}`,
-            }
-          : undefined,
+              downloadPath: `/api/report-card?name=${encodeURIComponent(name)}&month=${encodeURIComponent(loadedMonth)}`,
+            },
+          }
+        : {}),
     });
   }
 

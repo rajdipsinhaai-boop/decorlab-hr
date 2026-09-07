@@ -30,7 +30,10 @@ export function EmployeeDetail({
   const radarData = employee
     ? employee.criteria.length
       ? employee.criteria
-      : employee.breakdown.map((segment) => ({ name: segment.label, rating: Math.max(0, Math.min(5, segment.score / 20)) }))
+      : employee.breakdown.map((segment) => ({
+          name: segment.label,
+          rating: Math.max(0, Math.min(5, segment.score / 20)),
+        }))
     : [];
 
   return (
@@ -62,10 +65,13 @@ export function EmployeeDetail({
                   Rank in role {employee.rankInRole ?? "—"} · Overall {employee.overallRank ?? "—"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Avg {employee.avgHours}h/day · punctuality {employee.punctualityDeviation >= 0 ? "+" : ""}
+                  Avg {employee.avgHours}h/day · punctuality{" "}
+                  {employee.punctualityDeviation >= 0 ? "+" : ""}
                   {employee.punctualityDeviation} min
                 </p>
-                {employee.note ? <p className="text-xs text-muted-foreground">{employee.note}</p> : null}
+                {employee.note ? (
+                  <p className="text-xs text-muted-foreground">{employee.note}</p>
+                ) : null}
               </div>
             </div>
 
@@ -121,13 +127,19 @@ export function EmployeeDetail({
                   />
                 </div>
                 {employee.reportCard.scoreBuilt.length ? (
-                  <NarrativeList title="How this score was built" items={employee.reportCard.scoreBuilt} />
+                  <NarrativeList
+                    title="How this score was built"
+                    items={employee.reportCard.scoreBuilt}
+                  />
                 ) : null}
                 {employee.reportCard.whyScore.length ? (
                   <NarrativeList title="Why this score" items={employee.reportCard.whyScore} />
                 ) : null}
                 {employee.reportCard.improveNextMonth.length ? (
-                  <NarrativeList title="What to improve next month" items={employee.reportCard.improveNextMonth} />
+                  <NarrativeList
+                    title="What to improve next month"
+                    items={employee.reportCard.improveNextMonth}
+                  />
                 ) : null}
               </section>
             ) : null}
