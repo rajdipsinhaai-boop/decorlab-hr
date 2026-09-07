@@ -95,7 +95,13 @@ export interface RosterEntry {
 
 export type DashboardView =
   | { viewerRole: "admin"; data: DashboardData }
-  | { viewerRole: "manager"; month: string; months: string[]; roster: RosterEntry[]; own: Employee | null }
+  | {
+      viewerRole: "manager";
+      month: string;
+      months: string[];
+      roster: RosterEntry[];
+      own: Employee | null;
+    }
   | { viewerRole: "employee"; month: string; employee: Employee | null };
 
 export interface AccessUser {
