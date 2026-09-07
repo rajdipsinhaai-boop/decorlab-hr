@@ -227,6 +227,10 @@ function ReportCardDownloadButton({ path, filename }: { path: string; filename: 
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error("Report card could not be downloaded.", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
     } finally {
       setDownloading(false);
     }
