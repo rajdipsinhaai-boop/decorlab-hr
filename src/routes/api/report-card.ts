@@ -5,6 +5,7 @@ import reportCards from "@/data/report-cards.json";
 import type { ViewerRole } from "@/lib/hr-types";
 import { loadDashboard } from "@/lib/hr.server";
 import { buildReportCard } from "@/lib/cron/report-pdf.server";
+import { downloadFileBytes, listFolderFiles } from "@/lib/drive.server";
 import type { Database } from "@/integrations/supabase/types";
 
 type Snapshot = {
@@ -17,6 +18,26 @@ type Snapshot = {
 };
 
 const REPORT_CARDS = reportCards as Record<string, Snapshot>;
+const AUGUST_REPORT_FOLDER_ID =
+  process.env["GOOGLE_DRIVE_AUGUST_REPORT_FOLDER_ID"] ??
+  "1uyExyMUEF_XJDvQhvuyLsap9qV2pVTfW";
+
+let augustDriveFilesPromise: ReturnType<typeof listFolderFiles> | null = null;
+
+async function loadAugustDrivePdf(
+  name: string,
+): Promise<{ bytes: Uint8Array; filename: string } | null> {
+  augustDriveFilesPromise ??= listFolderFiles(AUGUST_REPORT_FOLDER_ID);
+  const files = await augustDriveFilesPromise;
+  const filename = `${name} - Report Card - August 2026.pdf`;
+  const file = files.find(
+    (entry) =>
+      entry.mimeType === "application/pdf" &&
+      entry.name.toLowerCase() === filename.toLowerCase(),
+  );
+  if (!file) return null;
+  return { bytes: await downloadFileBytes(file.id), filename: file.name };
+}
 
 type Profile = { role: ViewerRole; employeeId: string | null; employeeName: string | null };
 type AuthClaims = { email?: string | null };
@@ -85,7 +106,21 @@ export const Route = createFileRoute("/api/report-card")({
         const record = REPORT_CARDS[name.toLowerCase()];
         let bytes: Uint8Array;
         let filename: string;
-        if (month === "July 2026" && record?.pdfBase64) {
+        if (month === "August 2026") {
+          const drivePdf = await loadAugustDrivePdf(name);
+          if (drivePdf) {
+            bytes = drivePdf.bytes;
+            filename = drivePdf.filename;
+          } else {
+            const dashboard = await loadDashboard(month);
+            const employee = dashboard.employees.find(
+              (entry) => entry.name.toLowerCase() === name.toLowerCase(),
+            );
+            if (!employee) return new Response("Report card not found", { status: 404 });
+            bytes = await buildReportCard(employee, dashboard.month);
+            filename = `${employee.name} - Report Card - ${dashboard.month}.pdf`;
+          }
+        } else if (record?.pdfBase64) {
           bytes = Buffer.from(record.pdfBase64, "base64");
           filename = record.pdfFilename;
         } else {
