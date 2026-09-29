@@ -17,6 +17,7 @@ import { Route as ApiDashboardRouteImport } from './routes/api/dashboard'
 import { Route as ApiDirectorRatingDetailsRouteImport } from './routes/api/director-rating-details'
 import { Route as ApiDirectorRatingsRouteImport } from './routes/api/director-ratings'
 import { Route as ApiReportCardRouteImport } from './routes/api/report-card'
+import { Route as ApiPublicRdashIngestRouteImport } from './routes/api/public/rdash-ingest'
 import { Route as ApiPublicCronProcessQueueRouteImport } from './routes/api/public/cron/process-queue'
 
 const IndexRoute = IndexRouteImport.update({
@@ -59,6 +60,11 @@ const ApiReportCardRoute = ApiReportCardRouteImport.update({
   path: '/api/report-card',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicRdashIngestRoute = ApiPublicRdashIngestRouteImport.update({
+  id: '/api/public/rdash-ingest',
+  path: '/api/public/rdash-ingest',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicCronProcessQueueRoute =
   ApiPublicCronProcessQueueRouteImport.update({
     id: '/api/public/cron/process-queue',
@@ -74,6 +80,7 @@ export interface FileRoutesByFullPath {
   '/api/director-rating-details': typeof ApiDirectorRatingDetailsRoute
   '/api/director-ratings': typeof ApiDirectorRatingsRoute
   '/api/report-card': typeof ApiReportCardRoute
+  '/api/public/rdash-ingest': typeof ApiPublicRdashIngestRoute
   '/api/public/cron/process-queue': typeof ApiPublicCronProcessQueueRoute
 }
 export interface FileRoutesByTo {
@@ -84,6 +91,7 @@ export interface FileRoutesByTo {
   '/api/director-rating-details': typeof ApiDirectorRatingDetailsRoute
   '/api/director-ratings': typeof ApiDirectorRatingsRoute
   '/api/report-card': typeof ApiReportCardRoute
+  '/api/public/rdash-ingest': typeof ApiPublicRdashIngestRoute
   '/api/public/cron/process-queue': typeof ApiPublicCronProcessQueueRoute
 }
 export interface FileRoutesById {
@@ -96,6 +104,7 @@ export interface FileRoutesById {
   '/api/director-rating-details': typeof ApiDirectorRatingDetailsRoute
   '/api/director-ratings': typeof ApiDirectorRatingsRoute
   '/api/report-card': typeof ApiReportCardRoute
+  '/api/public/rdash-ingest': typeof ApiPublicRdashIngestRoute
   '/api/public/cron/process-queue': typeof ApiPublicCronProcessQueueRoute
 }
 export interface FileRouteTypes {
@@ -108,6 +117,7 @@ export interface FileRouteTypes {
     | '/api/director-rating-details'
     | '/api/director-ratings'
     | '/api/report-card'
+    | '/api/public/rdash-ingest'
     | '/api/public/cron/process-queue'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -118,6 +128,7 @@ export interface FileRouteTypes {
     | '/api/director-rating-details'
     | '/api/director-ratings'
     | '/api/report-card'
+    | '/api/public/rdash-ingest'
     | '/api/public/cron/process-queue'
   id:
     | '__root__'
@@ -129,6 +140,7 @@ export interface FileRouteTypes {
     | '/api/director-rating-details'
     | '/api/director-ratings'
     | '/api/report-card'
+    | '/api/public/rdash-ingest'
     | '/api/public/cron/process-queue'
   fileRoutesById: FileRoutesById
 }
@@ -140,6 +152,7 @@ export interface RootRouteChildren {
   ApiDirectorRatingDetailsRoute: typeof ApiDirectorRatingDetailsRoute
   ApiDirectorRatingsRoute: typeof ApiDirectorRatingsRoute
   ApiReportCardRoute: typeof ApiReportCardRoute
+  ApiPublicRdashIngestRoute: typeof ApiPublicRdashIngestRoute
   ApiPublicCronProcessQueueRoute: typeof ApiPublicCronProcessQueueRoute
 }
 
@@ -201,6 +214,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiReportCardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/rdash-ingest': {
+      id: '/api/public/rdash-ingest'
+      path: '/api/public/rdash-ingest'
+      fullPath: '/api/public/rdash-ingest'
+      preLoaderRoute: typeof ApiPublicRdashIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/cron/process-queue': {
       id: '/api/public/cron/process-queue'
       path: '/api/public/cron/process-queue'
@@ -230,6 +250,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDirectorRatingDetailsRoute: ApiDirectorRatingDetailsRoute,
   ApiDirectorRatingsRoute: ApiDirectorRatingsRoute,
   ApiReportCardRoute: ApiReportCardRoute,
+  ApiPublicRdashIngestRoute: ApiPublicRdashIngestRoute,
   ApiPublicCronProcessQueueRoute: ApiPublicCronProcessQueueRoute,
 }
 export const routeTree = rootRouteImport

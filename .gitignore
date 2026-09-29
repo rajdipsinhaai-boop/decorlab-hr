@@ -32,3 +32,6 @@ google-service-account.json
 *.njsproj
 *.sln
 *.sw?
+
+.env
+.env.local
