@@ -8,18 +8,9 @@ function matches(a: string, b: string) {
 }
 
 async function handle(request: Request) {
-  const expected = [
-    process.env["SUPABASE_ANON_KEY"],
-    process.env["VITE_SUPABASE_PUBLISHABLE_KEY"],
-  ].filter((v): v is string => Boolean(v));
-
-  const provided =
-    request.headers.get("apikey") ??
-    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
-    "";
-  if (!expected.some((key) => matches(provided, key))) {
-    return new Response("Unauthorized", { status: 401 });
-  }
+  const expected = process.env["CRON_SECRET"] ?? "";
+  const provided = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+  if (!matches(provided, expected)) return new Response("Unauthorized", { status: 401 });
 
   const { runScheduledPass } = await import("@/lib/cron/run.server");
   try {

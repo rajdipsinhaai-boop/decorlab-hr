@@ -3,11 +3,6 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
-const ADMIN_EMAILS = (process.env.ACCESS_ADMIN_EMAILS ?? "rajdipsinhaai@gmail.com")
-  .split(",")
-  .map((value) => value.trim().toLowerCase())
-  .filter(Boolean);
-
 type ApiContext = {
   supabase: SupabaseClient<Database>;
   claims: Record<string, unknown>;
@@ -15,15 +10,9 @@ type ApiContext = {
 };
 
 async function assertAdmin(context: ApiContext) {
-  const email = String(context.claims?.email ?? "").toLowerCase();
-  if (ADMIN_EMAILS.includes(email)) return;
-  const { data, error } = await context.supabase
-    .from("allowed_emails")
-    .select("role")
-    .ilike("email", email)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data || data.role !== "admin") throw new Error("Administrator access is required.");
+  const { resolveAccess } = await import("@/lib/access.server");
+  const { role } = await resolveAccess(context);
+  if (role !== "admin") throw new Error("Administrator access is required.");
 }
 
 export const Route = createFileRoute("/api/director-ratings")({
