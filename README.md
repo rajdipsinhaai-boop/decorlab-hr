@@ -97,13 +97,13 @@ There are three roles.
 | Role | Sees | Can do |
 |---|---|---|
 | **admin** (leadership) | Everything: all employees, scores, ranks, attendance | Upload files, create reports, manage who has access, enter director ratings, use the AI assistant |
-| **manager** | A roster of employees and their own result | View; download their own report card |
+| **manager** | A roster of employees and their own result | View; download their own report card; upload files |
 | **employee** | Only their own result | Download their own report card |
 
 **How the app decides someone's role** (checked in this order):
 
 1. Their email appears in the `ACCESS_ADMIN_EMAILS` setting → **admin**.
-2. Their email appears in the `ACCESS_PROFILES_JSON` setting, or is one of two addresses written directly into the code → the role given there.
+2. Their email appears in the `ACCESS_PROFILES_JSON` setting (or `ACCESS_MANAGER_EMAILS` for managers) → the role given there. No addresses are hard-coded.
 3. Their email has a row in the `allowed_emails` table in Supabase → the role stored there.
 4. Otherwise: if open signup is on (`ACCESS_OPEN_SIGNUPS`, **off by default**) they are let in as a plain **employee**; if it is off they are refused.
 
@@ -185,7 +185,7 @@ Files ending in `.server.ts` only ever run on the server. They contain secrets a
 There are two upload cards: **attendance** (a PDF) and **WhatsApp export** (a `.txt`, tagged with the group: Designers or Supervisors).
 
 1. The browser checks the file type and a 20 MB limit, turns the file into base64 text, and sends it to the server.
-2. The server checks the sign-in and role, then finds or creates a Drive folder named `<Month> - Attendance Uploads` or `<Month> - WhatsApp Exports`.
+2. The server checks the sign-in and role (managers and admins only; employees are refused), validates the month label, then finds or creates a Drive folder named `<Month> - Attendance Uploads` or `<Month> - WhatsApp Exports`.
 3. It uploads the file there.
 4. It appends **one row to the `Control` tab**: a new request ID, the time, who asked, the month, the status `PENDING`, the Drive link and the request type.
 5. The browser then checks that row every 18 seconds and shows a message when it turns `DONE` or `FAILED`.
@@ -200,7 +200,7 @@ Nothing is processed yet at this point. The upload only *queues* the work.
 
 ### 6.4 The queue processor (where the work actually happens)
 
-The processor is a web address: `/api/public/cron/process-queue`. Something outside this repository must call it on a schedule. It accepts a call only if it carries the Supabase publishable key.
+The processor is a web address: `/api/public/cron/process-queue`. Something outside this repository must call it on a schedule. It accepts a call only with `Authorization: Bearer <CRON_SECRET>`.
 
 Each call does the following:
 
@@ -317,7 +317,7 @@ Supabase Auth manages the actual accounts and passwords. The `supabase/migration
 
 ## 10. Configuration (environment variables)
 
-Names only — **never commit real values.** A template is in `.env.example`. Copy it to `.env` and fill it in; `.env` is ignored by git.
+Names only — **never commit real values.** A template is in `.env.example`. Copy it to `.env.local` and fill it in; `.env.local` is ignored by git. (A committed `.env` with only public browser values exists on `main`; never put secrets in it.)
 
 | Variable | Used for |
 |---|---|
@@ -330,6 +330,7 @@ Names only — **never commit real values.** A template is in `.env.example`. Co
 | `GOOGLE_DRIVE_AUGUST_REPORT_FOLDER_ID` | Folder used for the August report cards |
 | `CRON_SECRET` | Bearer token required by `/api/public/cron/process-queue` |
 | `ACCESS_ADMIN_EMAILS`, `ACCESS_MANAGER_EMAILS` | Comma-separated admin / manager emails (no hard-coded defaults) |
+| `RDASH_INGEST_KEY` | Shared secret for `/api/public/rdash-ingest` |
 | `ACCESS_OPEN_SIGNUPS` | `true` lets any confirmed account in as an employee; default is closed |
 | `ACCESS_ADMIN_EMAILS` | Comma-separated admin emails |
 | `ACCESS_PROFILES_JSON` | Extra role assignments per email |
@@ -376,14 +377,21 @@ Being upfront about these so nobody is surprised.
 - **Nothing in this repo triggers it.** Whoever calls it on a schedule is configured elsewhere.
 - One row per call, no automatic retries for `FAILED` rows (someone resets the status to `PENDING`), and two overlapping calls can pick the same row.
 - A slow job (over 90 minutes) can be picked up a second time.
-- It requires `Authorization: Bearer <CRON_SECRET>`. Schedule the pg_cron job by hand with that secret (migration `202609300001` removes the old job that used the public key).
+- It requires `Authorization: Bearer <CRON_SECRET>`. Replace the existing pg_cron job in one step (same job name updates it, so there is no gap), substituting the real secret:
+  ```sql
+  select cron.schedule('decorlab-process-queue', '*/20 * * * *', $$
+    select extensions.http_post(
+      url := 'https://decorlab-hr.vercel.app/api/public/cron/process-queue',
+      headers := jsonb_build_object('Authorization', 'Bearer <CRON_SECRET>'),
+      body := '{"source":"pg_cron"}'::jsonb, timeout_milliseconds := 60000) $$);
+  ```
 
 **Uploads**
 - **The attendance card asks for a PDF, but the processor rejects PDFs.** Every attendance upload from the current UI ends as `FAILED` with a message asking for a CSV or Google Sheet.
 
 **Access**
-- Open signup is **on by default**: any confirmed Supabase account can enter as an employee.
-- The role-checking code is copied into three files (`hr.functions.ts`, `api/dashboard.ts`, `api/report-card.ts`) and two email addresses are written directly into the code.
+- Signup is closed by default; set `ACCESS_OPEN_SIGNUPS=true` to let any confirmed account in as an employee.
+- Role checking lives in one place, `src/lib/access.server.ts`.
 
 **Ratings**
 - Director ratings are overwritten in place. There is no edit history.
@@ -397,13 +405,13 @@ Being upfront about these so nobody is surprised.
 
 The plan under discussion replaces the "Sheet as database and queue" design with:
 
-1. An **ingest endpoint** that verifies a signed request from the scheduled Claude task, queues the job, and answers quickly.
+1. An **ingest endpoint** (`POST /api/public/rdash-ingest`, header `x-ingest-key` equal to `RDASH_INGEST_KEY`, 256 KB body cap) that stores what the scheduled Claude task sends in `rdash_ingests`.
 2. A **real database** holding DPR entries, attendance, director ratings and scores.
 3. The dashboard showing what is already present and **asking only for what is missing** (attendance, director rating). The *Generate report* button stays disabled until everything is there.
 4. **Queued jobs** that calculate scores per role in parallel, build the PDFs, and send them out (WhatsApp / email) with status tracking.
 5. Scoring formulas written down as tested code, checked against the Sheet for at least one month before switching.
 
-A first, unfinished piece of this exists in the working tree: `src/routes/api/public/rdash-ingest.ts` and its migration `supabase/migrations/202609290001_create_rdash_ingests.sql`. It is not yet applied, tested or deployed.
+A first, unfinished piece of this exists in the working tree: `src/routes/api/public/rdash-ingest.ts` and its migration `supabase/migrations/202609290001_create_rdash_ingests.sql`. The table migration must be applied by hand, and the endpoint has not yet been tested end to end.
 
 ---
 

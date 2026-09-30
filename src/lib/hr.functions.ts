@@ -30,6 +30,21 @@ async function assertLeadership(context: { supabase: any; claims: any }): Promis
   return email;
 }
 
+/** Upload surfaces: managers and admins only (employees only view their own result). */
+async function assertUploader(context: { supabase: any; claims: any }) {
+  const access = await assertAllowed(context);
+  if (access.role === "employee") throw new Error("Only managers and administrators can upload files.");
+  return access;
+}
+
+// Month labels end up in Drive folder names/queries and Sheets cells (USER_ENTERED), so accept only "Month YYYY".
+const MONTH_RE =
+  /^(January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/;
+function validMonth(value: unknown): string {
+  if (typeof value !== "string" || !MONTH_RE.test(value)) throw new Error("A valid month is required.");
+  return value;
+}
+
 export const getDashboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<DashboardView> => {
@@ -181,10 +196,7 @@ export const forceConfirmUser = createServerFn({ method: "POST" })
 export const createReportRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { month: string }) => {
-    if (!input?.month || typeof input.month !== "string" || input.month.length > 60) {
-      throw new Error("A valid month is required.");
-    }
-    return { month: input.month };
+    return { month: validMonth(input?.month) };
   })
   .handler(async ({ data, context }): Promise<{ requestId: string }> => {
     const email = await assertLeadership(context as never);
@@ -224,9 +236,7 @@ interface UploadInput {
 }
 
 function validateUpload(input: UploadInput, ext: ".pdf" | ".txt"): UploadInput {
-  if (!input?.month || typeof input.month !== "string" || input.month.length > 60) {
-    throw new Error("A valid month is required.");
-  }
+  validMonth(input?.month);
   if (!input?.filename || !input.filename.toLowerCase().endsWith(ext)) {
     throw new Error(`Please select a ${ext} file.`);
   }
@@ -239,7 +249,7 @@ export const uploadAttendance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: UploadInput) => validateUpload(input, ".pdf"))
   .handler(async ({ data, context }): Promise<{ requestId: string; driveLink: string }> => {
-    const { email } = await assertAllowed(context as never);
+    const { email } = await assertUploader(context as never);
     const { findOrCreateFolder, uploadFile } = await import("./drive.server");
     const { appendRow } = await import("./sheets.server");
 
@@ -276,7 +286,7 @@ export const uploadWhatsAppExport = createServerFn({ method: "POST" })
     return { ...valid, group };
   })
   .handler(async ({ data, context }): Promise<{ requestId: string; driveLink: string }> => {
-    const { email } = await assertAllowed(context as never);
+    const { email } = await assertUploader(context as never);
     const { findOrCreateFolder, uploadFile } = await import("./drive.server");
     const { appendRow } = await import("./sheets.server");
 
