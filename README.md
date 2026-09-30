@@ -105,7 +105,7 @@ There are three roles.
 1. Their email appears in the `ACCESS_ADMIN_EMAILS` setting → **admin**.
 2. Their email appears in the `ACCESS_PROFILES_JSON` setting, or is one of two addresses written directly into the code → the role given there.
 3. Their email has a row in the `allowed_emails` table in Supabase → the role stored there.
-4. Otherwise: if open signup is on (`ACCESS_OPEN_SIGNUPS`, **on by default**) they are let in as a plain **employee**; if it is off they are refused.
+4. Otherwise: if open signup is on (`ACCESS_OPEN_SIGNUPS`, **off by default**) they are let in as a plain **employee**; if it is off they are refused.
 
 Sign-in itself uses Supabase (email and password). The dashboard pages are protected by an `_authenticated` route that redirects to `/auth` if nobody is signed in.
 
@@ -328,10 +328,12 @@ Names only — **never commit real values.** A template is in `.env.example`. Co
 | `GOOGLE_SHEET_ID` | Which spreadsheet to use |
 | `GOOGLE_DRIVE_ROOT_FOLDER_ID` | Parent folder for all created folders |
 | `GOOGLE_DRIVE_AUGUST_REPORT_FOLDER_ID` | Folder used for the August report cards |
-| `CRON_SECRET` | Declared, but the processor currently checks the Supabase key instead (section 12) |
+| `CRON_SECRET` | Bearer token required by `/api/public/cron/process-queue` |
+| `ACCESS_ADMIN_EMAILS`, `ACCESS_MANAGER_EMAILS` | Comma-separated admin / manager emails (no hard-coded defaults) |
+| `ACCESS_OPEN_SIGNUPS` | `true` lets any confirmed account in as an employee; default is closed |
 | `ACCESS_ADMIN_EMAILS` | Comma-separated admin emails |
 | `ACCESS_PROFILES_JSON` | Extra role assignments per email |
-| `ACCESS_OPEN_SIGNUPS` | `false` to require an allow-list entry; defaults to open |
+| `ACCESS_OPEN_SIGNUPS` | `true` to let any confirmed account in; defaults to closed |
 | `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` | Optional AI assistant |
 
 Anything starting with `VITE_` is baked into the browser code. Everything else stays on the server.
@@ -374,7 +376,7 @@ Being upfront about these so nobody is surprised.
 - **Nothing in this repo triggers it.** Whoever calls it on a schedule is configured elsewhere.
 - One row per call, no automatic retries for `FAILED` rows (someone resets the status to `PENDING`), and two overlapping calls can pick the same row.
 - A slow job (over 90 minutes) can be picked up a second time.
-- It is authenticated with the Supabase publishable key, which is not secret (it ships in the browser). `CRON_SECRET` is declared but not used for this.
+- It requires `Authorization: Bearer <CRON_SECRET>`. Schedule the pg_cron job by hand with that secret (migration `202609300001` removes the old job that used the public key).
 
 **Uploads**
 - **The attendance card asks for a PDF, but the processor rejects PDFs.** Every attendance upload from the current UI ends as `FAILED` with a message asking for a CSV or Google Sheet.
@@ -387,7 +389,7 @@ Being upfront about these so nobody is surprised.
 - Director ratings are overwritten in place. There is no edit history.
 
 **Operations**
-- No automated tests, no CI, two lockfiles (`pnpm-lock.yaml` and `package-lock.json`), and migrations are applied by hand.
+- No automated tests, no CI, one lockfile (`pnpm-lock.yaml`), and migrations are applied by hand.
 
 ---
 

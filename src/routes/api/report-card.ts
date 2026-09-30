@@ -1,12 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import reportCards from "@/data/report-cards.json";
 import augustReportPdfs from "@/data/august-report-pdfs.json";
-import type { ViewerRole } from "@/lib/hr-types";
 import { loadDashboard } from "@/lib/hr.server";
 import { buildReportCard } from "@/lib/cron/report-pdf.server";
-import type { Database } from "@/integrations/supabase/types";
 
 type Snapshot = {
   month: string;
@@ -22,51 +19,9 @@ const REPORT_CARDS = reportCards as Record<string, Snapshot>;
 type AugustReportPdf = { filename: string; pdfBase64: string };
 const AUGUST_REPORT_PDFS = augustReportPdfs as Record<string, AugustReportPdf>;
 
-type Profile = { role: ViewerRole; employeeId: string | null; employeeName: string | null };
-type AuthClaims = { email?: string | null };
-
-type AuthContext = {
-  supabase: SupabaseClient<Database>;
-  claims: AuthClaims;
-};
-
-async function resolveProfile(context: AuthContext): Promise<Profile> {
-  const email = String(context.claims?.email ?? "").toLowerCase();
-  const admins = (process.env["ACCESS_ADMIN_EMAILS"] ?? "rajdipsinhaai@gmail.com")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-  if (admins.includes(email)) return { role: "admin", employeeId: null, employeeName: null };
-
-  try {
-    const profiles = JSON.parse(process.env["ACCESS_PROFILES_JSON"] ?? "{}").profiles ?? {};
-    const configured =
-      profiles[email] ??
-      (["adey020@gmail.com", "mundigenius@gmail.com"].includes(email) ? { role: "manager" } : null);
-    if (configured) {
-      return {
-        role: configured.role === "employee" ? "employee" : "manager",
-        employeeId: typeof configured.employeeId === "string" ? configured.employeeId : null,
-        employeeName: typeof configured.employeeName === "string" ? configured.employeeName : null,
-      };
-    }
-  } catch {
-    // Fall through to the database allow-list.
-  }
-
-  const { data, error } = await context.supabase
-    .from("allowed_emails")
-    .select("email, role, employee_id, employee_name")
-    .ilike("email", email)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("Your account is not on the Decorlab HR access list.");
-  return {
-    role: data.role === "admin" ? "admin" : data.role === "manager" ? "manager" : "employee",
-
-    employeeId: data.employee_id ?? null,
-    employeeName: data.employee_name ?? null,
-  };
+async function resolveProfile(context: { supabase: any; claims: any }) {
+  const { resolveAccess } = await import("@/lib/access.server");
+  return resolveAccess(context);
 }
 
 export const Route = createFileRoute("/api/report-card")({

@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { AccessUser, ControlRow, DashboardView, ViewerRole } from "./hr-types";
-import { isOpenSignupEnabled } from "./access-policy";
 
 const CONTROL_RANGE = "Control!A:H";
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -11,83 +10,9 @@ function utcStamp() {
   return new Date().toISOString().replace("T", " ").slice(0, 19);
 }
 
-type AccessProfile = { role: ViewerRole; employeeId: string | null; employeeName: string | null };
-
-function configuredProfile(email: string): AccessProfile | null {
-  const admins = (process.env.ACCESS_ADMIN_EMAILS ?? "rajdipsinhaai@gmail.com")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-  if (admins.includes(email)) return { role: "admin", employeeId: null, employeeName: null };
-
-  try {
-    const profiles = JSON.parse(process.env.ACCESS_PROFILES_JSON ?? "{}").profiles ?? {};
-    const profile =
-      profiles[email] ??
-      (["adey020@gmail.com", "mundigenius@gmail.com"].includes(email) ? { role: "manager" } : null);
-    if (!profile) return null;
-    const role =
-      profile.role === "admin" || profile.role === "manager" || profile.role === "employee"
-        ? profile.role
-        : null;
-    if (!role) return null;
-    return {
-      role,
-      employeeId: typeof profile.employeeId === "string" ? profile.employeeId : null,
-      employeeName: typeof profile.employeeName === "string" ? profile.employeeName : null,
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function assertAllowed(context: { supabase: any; claims: any }): Promise<{
-  email: string;
-  role: ViewerRole;
-  employeeId: string | null;
-  employeeName: string | null;
-}> {
-  const email = (context.claims?.email ?? "").toString().toLowerCase();
-  if (!email) throw new Error("No email on this account.");
-  const configured = configuredProfile(email);
-  if (configured) return { email, ...configured };
-
-  let data: any;
-  let error: any;
-  ({ data, error } = await context.supabase
-    .from("allowed_emails")
-    .select("email, role, employee_id, employee_name")
-    .ilike("email", email)
-    .maybeSingle());
-  if (error) {
-    ({ data, error } = await context.supabase
-      .from("allowed_emails")
-      .select("email, role")
-      .ilike("email", email)
-      .maybeSingle());
-  }
-  if (error && isOpenSignupEnabled()) {
-    return { email, role: "employee", employeeId: null, employeeName: null };
-  }
-  if (error) throw new Error(error.message);
-  if (!data) {
-    if (isOpenSignupEnabled()) {
-      return { email, role: "employee", employeeId: null, employeeName: null };
-    }
-    throw new Error("Your account is not on the Decorlab HR access list.");
-  }
-  const role =
-    data.role === "leadership" || data.role === "admin"
-      ? "admin"
-      : data.role === "manager"
-        ? "manager"
-        : "employee";
-  return {
-    email,
-    role,
-    employeeId: data.employee_id ?? null,
-    employeeName: data.employee_name ?? null,
-  };
+async function assertAllowed(context: { supabase: any; claims: any }) {
+  const { resolveAccess } = await import("./access.server");
+  return resolveAccess(context);
 }
 
 async function assertAdmin(context: { supabase: any; claims: any }): Promise<string> {
@@ -235,12 +160,16 @@ export const forceConfirmUser = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<{ email: string; confirmed: boolean }> => {
     await assertAdmin(context as never);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000,
-    });
-    if (listError) throw new Error(listError.message);
-    const user = users.users.find((candidate) => candidate.email?.toLowerCase() === data.email);
+    let user: { id: string } | undefined;
+    for (let page = 1; !user; page++) {
+      const { data: res, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+        page,
+        perPage: 1000,
+      });
+      if (listError) throw new Error(listError.message);
+      user = res.users.find((c) => c.email?.toLowerCase() === data.email);
+      if (res.users.length < 1000) break;
+    }
     if (!user) throw new Error("No account exists for this email yet.");
     const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
       email_confirm: true,
