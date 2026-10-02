@@ -12,11 +12,14 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedChangePasswordRouteImport } from './routes/_authenticated/change-password'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as ApiChangePasswordRouteImport } from './routes/api/change-password'
 import { Route as ApiDashboardRouteImport } from './routes/api/dashboard'
 import { Route as ApiDirectorRatingDetailsRouteImport } from './routes/api/director-rating-details'
 import { Route as ApiDirectorRatingsRouteImport } from './routes/api/director-ratings'
 import { Route as ApiReportCardRouteImport } from './routes/api/report-card'
+import { Route as ApiPublicAttendanceSummaryRouteImport } from './routes/api/public/attendance-summary'
 import { Route as ApiPublicRdashIngestRouteImport } from './routes/api/public/rdash-ingest'
 import { Route as ApiPublicCronProcessQueueRouteImport } from './routes/api/public/cron/process-queue'
 
@@ -34,10 +37,21 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedChangePasswordRoute =
+  AuthenticatedChangePasswordRouteImport.update({
+    id: '/change-password',
+    path: '/change-password',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const ApiChangePasswordRoute = ApiChangePasswordRouteImport.update({
+  id: '/api/change-password',
+  path: '/api/change-password',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDashboardRoute = ApiDashboardRouteImport.update({
   id: '/api/dashboard',
@@ -60,6 +74,12 @@ const ApiReportCardRoute = ApiReportCardRouteImport.update({
   path: '/api/report-card',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicAttendanceSummaryRoute =
+  ApiPublicAttendanceSummaryRouteImport.update({
+    id: '/api/public/attendance-summary',
+    path: '/api/public/attendance-summary',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicRdashIngestRoute = ApiPublicRdashIngestRouteImport.update({
   id: '/api/public/rdash-ingest',
   path: '/api/public/rdash-ingest',
@@ -75,22 +95,28 @@ const ApiPublicCronProcessQueueRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/change-password': typeof AuthenticatedChangePasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/api/change-password': typeof ApiChangePasswordRoute
   '/api/dashboard': typeof ApiDashboardRoute
   '/api/director-rating-details': typeof ApiDirectorRatingDetailsRoute
   '/api/director-ratings': typeof ApiDirectorRatingsRoute
   '/api/report-card': typeof ApiReportCardRoute
+  '/api/public/attendance-summary': typeof ApiPublicAttendanceSummaryRoute
   '/api/public/rdash-ingest': typeof ApiPublicRdashIngestRoute
   '/api/public/cron/process-queue': typeof ApiPublicCronProcessQueueRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/change-password': typeof AuthenticatedChangePasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/api/change-password': typeof ApiChangePasswordRoute
   '/api/dashboard': typeof ApiDashboardRoute
   '/api/director-rating-details': typeof ApiDirectorRatingDetailsRoute
   '/api/director-ratings': typeof ApiDirectorRatingsRoute
   '/api/report-card': typeof ApiReportCardRoute
+  '/api/public/attendance-summary': typeof ApiPublicAttendanceSummaryRoute
   '/api/public/rdash-ingest': typeof ApiPublicRdashIngestRoute
   '/api/public/cron/process-queue': typeof ApiPublicCronProcessQueueRoute
 }
@@ -99,11 +125,14 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/_authenticated/change-password': typeof AuthenticatedChangePasswordRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/api/change-password': typeof ApiChangePasswordRoute
   '/api/dashboard': typeof ApiDashboardRoute
   '/api/director-rating-details': typeof ApiDirectorRatingDetailsRoute
   '/api/director-ratings': typeof ApiDirectorRatingsRoute
   '/api/report-card': typeof ApiReportCardRoute
+  '/api/public/attendance-summary': typeof ApiPublicAttendanceSummaryRoute
   '/api/public/rdash-ingest': typeof ApiPublicRdashIngestRoute
   '/api/public/cron/process-queue': typeof ApiPublicCronProcessQueueRoute
 }
@@ -112,22 +141,28 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/change-password'
     | '/dashboard'
+    | '/api/change-password'
     | '/api/dashboard'
     | '/api/director-rating-details'
     | '/api/director-ratings'
     | '/api/report-card'
+    | '/api/public/attendance-summary'
     | '/api/public/rdash-ingest'
     | '/api/public/cron/process-queue'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
+    | '/change-password'
     | '/dashboard'
+    | '/api/change-password'
     | '/api/dashboard'
     | '/api/director-rating-details'
     | '/api/director-ratings'
     | '/api/report-card'
+    | '/api/public/attendance-summary'
     | '/api/public/rdash-ingest'
     | '/api/public/cron/process-queue'
   id:
@@ -135,11 +170,14 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/_authenticated/change-password'
     | '/_authenticated/dashboard'
+    | '/api/change-password'
     | '/api/dashboard'
     | '/api/director-rating-details'
     | '/api/director-ratings'
     | '/api/report-card'
+    | '/api/public/attendance-summary'
     | '/api/public/rdash-ingest'
     | '/api/public/cron/process-queue'
   fileRoutesById: FileRoutesById
@@ -148,10 +186,12 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiChangePasswordRoute: typeof ApiChangePasswordRoute
   ApiDashboardRoute: typeof ApiDashboardRoute
   ApiDirectorRatingDetailsRoute: typeof ApiDirectorRatingDetailsRoute
   ApiDirectorRatingsRoute: typeof ApiDirectorRatingsRoute
   ApiReportCardRoute: typeof ApiReportCardRoute
+  ApiPublicAttendanceSummaryRoute: typeof ApiPublicAttendanceSummaryRoute
   ApiPublicRdashIngestRoute: typeof ApiPublicRdashIngestRoute
   ApiPublicCronProcessQueueRoute: typeof ApiPublicCronProcessQueueRoute
 }
@@ -179,12 +219,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/change-password': {
+      id: '/_authenticated/change-password'
+      path: '/change-password'
+      fullPath: '/change-password'
+      preLoaderRoute: typeof AuthenticatedChangePasswordRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/change-password': {
+      id: '/api/change-password'
+      path: '/api/change-password'
+      fullPath: '/api/change-password'
+      preLoaderRoute: typeof ApiChangePasswordRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/dashboard': {
       id: '/api/dashboard'
@@ -214,6 +268,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiReportCardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/attendance-summary': {
+      id: '/api/public/attendance-summary'
+      path: '/api/public/attendance-summary'
+      fullPath: '/api/public/attendance-summary'
+      preLoaderRoute: typeof ApiPublicAttendanceSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/rdash-ingest': {
       id: '/api/public/rdash-ingest'
       path: '/api/public/rdash-ingest'
@@ -232,10 +293,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedChangePasswordRoute: typeof AuthenticatedChangePasswordRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedChangePasswordRoute: AuthenticatedChangePasswordRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
 }
 
@@ -246,10 +309,12 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiChangePasswordRoute: ApiChangePasswordRoute,
   ApiDashboardRoute: ApiDashboardRoute,
   ApiDirectorRatingDetailsRoute: ApiDirectorRatingDetailsRoute,
   ApiDirectorRatingsRoute: ApiDirectorRatingsRoute,
   ApiReportCardRoute: ApiReportCardRoute,
+  ApiPublicAttendanceSummaryRoute: ApiPublicAttendanceSummaryRoute,
   ApiPublicRdashIngestRoute: ApiPublicRdashIngestRoute,
   ApiPublicCronProcessQueueRoute: ApiPublicCronProcessQueueRoute,
 }

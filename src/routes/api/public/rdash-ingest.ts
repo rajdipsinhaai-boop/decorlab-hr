@@ -1,20 +1,10 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import { createFileRoute } from "@tanstack/react-router";
+import { ingestAuthorized } from "@/lib/ingest-auth.server";
 
 const MAX_BODY_BYTES = 256 * 1024;
-const sha = (v: string) => createHash("sha256").update(v).digest();
-const same = (a: string, b: string) => timingSafeEqual(sha(a), sha(b));
-
-// Claude's scheduled task sends: x-ingest-key: <RDASH_INGEST_KEY>
-// ponytail: single shared secret, no rotation; move to per-client keys if more senders appear
-function authorized(request: Request) {
-  const expected = process.env["RDASH_INGEST_KEY"];
-  if (!expected) return false;
-  return same(request.headers.get("x-ingest-key") ?? "", expected);
-}
 
 async function handle(request: Request) {
-  if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+  if (!ingestAuthorized(request)) return new Response("Unauthorized", { status: 401 });
 
   const raw = await request.text();
   if (Buffer.byteLength(raw) > MAX_BODY_BYTES)
@@ -37,7 +27,17 @@ async function handle(request: Request) {
     console.error("rdash ingest failed:", error);
     return Response.json({ ok: false, error: error.message }, { status: 500 });
   }
-  return Response.json({ ok: true, received_from: "claude", ...data });
+
+  // The payload is safely stored; recomputing the month's scores from it is best effort.
+  let scores: unknown = null;
+  try {
+    const { applyAuditPayload } = await import("@/lib/audit-ingest.server");
+    scores = await applyAuditPayload(payload);
+  } catch (applyError) {
+    console.error("rdash ingest: could not apply scores:", applyError);
+    scores = { error: (applyError as Error).message };
+  }
+  return Response.json({ ok: true, received_from: "claude", ...data, scores });
 }
 
 export const Route = createFileRoute("/api/public/rdash-ingest")({

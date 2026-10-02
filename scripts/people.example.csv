@@ -1,0 +1,3 @@
+email,name,employee_id,position,role
+jane@example.com,Jane Doe,DLB-DSG-99,Designer,employee
+lead@example.com,Sam Lead,DLB-SUP-99,Manager,manager

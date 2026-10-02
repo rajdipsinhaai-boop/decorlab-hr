@@ -107,6 +107,24 @@ There are three roles.
 3. Their email has a row in the `allowed_emails` table in Supabase → the role stored there.
 4. Otherwise: if open signup is on (`ACCESS_OPEN_SIGNUPS`, **off by default**) they are let in as a plain **employee**; if it is off they are refused.
 
+### Creating accounts for employees
+
+There is no self-signup. An administrator creates accounts with `scripts/provision-accounts.mjs`:
+
+1. Run `supabase/migrations/202610020001_allowed_emails_position.sql` once (adds the `position` column).
+2. Prepare a CSV (see `scripts/people.example.csv`): `email,name,employee_id,position,role`. Real CSVs are git-ignored.
+3. Dry run, then apply (the service-role key and default password live only in your shell):
+   ```bash
+   export SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... DEFAULT_EMPLOYEE_PASSWORD=...
+   node scripts/provision-accounts.mjs people.csv            # preview, writes nothing
+   node scripts/provision-accounts.mjs people.csv --apply    # create accounts + access rows
+   ```
+4. Every new account has its email pre-confirmed and is flagged `must_change_password`: on first sign-in the person is sent to `/change-password`, and the server refuses all data until they choose their own password.
+5. Existing accounts keep their password; re-running is safe. Admin rows are never demoted without `--allow-demote`.
+6. In Supabase, turn off Authentication > Sign In / Providers > "Allow new users to sign up".
+
+Employees (`employee` role) can see only their own score and download only their own report card.
+
 Sign-in itself uses Supabase (email and password). The dashboard pages are protected by an `_authenticated` route that redirects to `/auth` if nobody is signed in.
 
 ---
@@ -174,35 +192,44 @@ Files ending in `.server.ts` only ever run on the server. They contain secrets a
 1. The browser opens `/dashboard`. The route guard confirms the user is signed in.
 2. The page asks the server for data (`getDashboard`).
 3. The server works out the user's role (section 3).
-4. For an **admin** it calls `loadDashboard(month)`, which asks Google for these ranges in one batch:
-   `Monthly Summary`, `Employee Master`, `Supervisor KRA`, `Designer KRA`, `EA KRA` and `Daily Attendance`.
-5. It builds one record per employee: score, RAG colour, ranks, the score breakdown, criteria ratings, attendance figures, and DPR / task activity.
-6. Managers and employees get a trimmed version containing only what they are allowed to see.
-7. If Google cannot be reached, the app quietly uses a saved JSON snapshot instead (see section 12).
+4. For an **admin** it calls `loadDashboard(month)`, which reads the database (no Google involved): the `employees` roster, that month's `attendance_records` and `monthly_scores`, and any director ratings.
+5. The month list is built from the data: every month from the first one on record to the current month, newest first. With no month chosen (or an unknown one) the newest month that has data is shown. Nothing about July or August is hardcoded.
+6. It builds one record per employee: score (empty until the month is scored), RAG colour, ranks, breakdown, criteria, attendance figures computed from the daily records, and DPR activity from the latest Claude audit. Only people who appear in a month's data are listed for that month.
+7. Managers and employees get a trimmed version containing only what they are allowed to see.
+
+The pure assembly step lives in `src/lib/dashboard-build.ts` (unit-tested); `src/lib/hr.server.ts` only fetches rows.
 
 ### 6.2 Uploading files
 
-There are two upload cards: **attendance** (a PDF) and **WhatsApp export** (a `.txt`, tagged with the group: Designers or Supervisors).
+There are two upload cards: **attendance** and **WhatsApp export** (a `.txt`, tagged with the group: Designers or Supervisors).
 
-1. The browser checks the file type and a 20 MB limit, turns the file into base64 text, and sends it to the server.
-2. The server checks the sign-in and role (managers and admins only; employees are refused), validates the month label, then finds or creates a Drive folder named `<Month> - Attendance Uploads` or `<Month> - WhatsApp Exports`.
-3. It uploads the file there.
-4. It appends **one row to the `Control` tab**: a new request ID, the time, who asked, the month, the status `PENDING`, the Drive link and the request type.
-5. The browser then checks that row every 18 seconds and shows a message when it turns `DONE` or `FAILED`.
+**Attendance (database queue, no Google).** Upload the biometric *Organization-Wise Attendance* report as a **PDF or an Excel (.xlsx)** file. There is no month to pick: it is read from the report title.
 
-Nothing is processed yet at this point. The upload only *queues* the work.
+1. The server checks the sign-in and role (managers and admins only) and checks the file by its bytes (PDF or xlsx), not its name.
+2. The raw file is stored in the private Supabase Storage bucket `attendance-uploads` and a row is added to `attendance_uploads`.
+3. A job of type `attendance.import` is added to the `jobs` table, and the worker runs it immediately, so the result normally comes back in the same request. If it is still running the card polls the job every 3 seconds.
+4. The worker (`src/lib/attendance/import.server.ts`) parses the file (`parse-xlsx.server.ts` / `parse-pdf.server.ts`), maps every person to an employee, and saves all records in **one transaction** (`import_attendance_records`). Re-uploading a month replaces it; it never duplicates.
+5. Mapping order: ignore list (`attendance_exclusions`, e.g. the driver), then biometric id (`employees.cosec_id`), then exact name, then a known spelling (`employee_aliases`). A near-miss is only ever *suggested*, never linked automatically. Anyone not recognised is saved unmapped and shown on the card; an admin links them to an employee or excludes them.
+6. The card shows the detected month, rows saved, who matched, who needs a decision, parser warnings, and each person's present / half / absent / leave days and average hours.
+
+How a day is classified (from the two half-day codes): `PR+PR` Present, one `PR` Half Day, any `IN` Incomplete, `AB+AB` Absent, `WO+WO` Week Off, `PH` Holiday, leave codes Leave. Present, Half Day and Incomplete all count as **present days** (the convention the tracker has always used).
+
+**WhatsApp export (unchanged).** The file goes to a Drive folder and one row is appended to the `Control` tab; the browser polls that row every 18 seconds. The upload only *queues* the work.
 
 ### 6.3 Creating report cards
 
-1. An admin presses **Create Report** for a month.
-2. The server appends a `PENDING` row of type "Create Report" to `Control`. There is no file.
-3. The same 18-second polling starts.
+1. An admin presses **Create Report** (or **Finalize month**) for a month.
+2. The server adds a `report.generate` job to the database queue and runs the worker straight away. No Google Sheet or Drive is involved.
+3. The worker builds every employee's report card PDF from that month's scores and stores them in the private Supabase Storage bucket `report-cards` (`<yyyy-mm>/<employee id>.pdf`).
+4. The dashboard polls the job and says when it is done. Cards are downloaded from each employee's detail view.
 
 ### 6.4 The queue processor (where the work actually happens)
 
 The processor is a web address: `/api/public/cron/process-queue`. Something outside this repository must call it on a schedule. It accepts a call only with `Authorization: Bearer <CRON_SECRET>`.
 
-Each call does the following:
+Each call first drains the **database job queue** (`jobs` table, `src/lib/jobs/`): it claims jobs one at a time with `claim_job()` (`FOR UPDATE SKIP LOCKED`, so workers never take the same job), retries failures with backoff (1, 2, 4 minutes, 3 attempts), and re-queues a job whose worker died. To add a background task, add one line to `HANDLERS` in `src/lib/jobs/worker.server.ts`. This is also what retries an attendance import that did not finish inside the upload request.
+
+It then runs the older Google-Sheet `Control` queue, which still carries report cards and WhatsApp exports:
 
 1. Makes sure the `Control` tab has its extra columns.
 2. Reads the queue and picks **one** row: the first `PENDING` one, or a `PROCESSING` one that has not been touched for over 90 minutes (assumed abandoned).
@@ -211,28 +238,29 @@ Each call does the following:
 
 | Type | What it does |
 |---|---|
-| **Attendance Upload** | Downloads the file from Drive and reads it as a table. Appends the rows to the `Daily Attendance` tab. **PDFs are refused on purpose** (the row becomes `FAILED`) because reading numbers out of a PDF risks silent errors. It needs a CSV or a Google Sheet with the columns Date, Day, Employee Name, Status, In Time, Out Time, Hours Worked. |
+| **Attendance Upload** | No longer handled here. A leftover request from the old flow is marked `FAILED` with a message to re-upload. |
 | **WhatsApp Export** | Marks the row `DONE` right away. Real processing is done by an outside automation. |
-| **Create Report** | Loads the dashboard data, builds a one-page PDF per employee, uploads them to a `<Month> - Report Cards` Drive folder, and marks the row `DONE` with the folder link. If more than half fail, the row is `FAILED`. |
+| **Create Report** | No longer handled here (report cards are a database job now). A leftover request is marked `FAILED` with a message to press Create Report again. |
 
 5. Marks the row `DONE` or `FAILED` (with a reason in the *Error Notes* column).
-6. **Every call also** syncs activity logs and scores follow-ups:
-   - It looks in a Drive staging folder for files named `DPR Activity Log - <Month>` and `Task Activity Log - <Month>` and appends them to the Sheet. This is how DPR and task data reach the dashboard today.
-   - Once per month it reads the follow-up trackers and gives the Executive Assistant a follow-up discipline rating, remembering the month in an `Automation State` tab so it isn't repeated.
+6. **Switched off by default:** the old Drive-to-Sheet activity-log sync and the monthly EA follow-up scoring. Scores no longer depend on them (DPR evidence now arrives in the Claude post; ratings live in the database). Set `LEGACY_SHEET_JOBS=true` to run them again.
 
 Because each call handles only one row, several queued requests take several calls.
 
 ### 6.5 Director ratings
 
-Admins can enter a **director rating** per employee per month (0–100) with notes, and a more detailed rating **per KRA parameter** (0–5). Both are saved straight into Supabase tables using an "upsert": if a rating for that month and employee already exists it is overwritten; otherwise it is created. There is no history of previous values.
+Admins rate every KRA parameter (0–5) for every employee in the **Director Ratings** panel. The parameters and their weights per role live in the `kra_parameters` table (seeded from the old sheet). Opening a month creates one **blank** row per employee per parameter, so the panel is never empty. A blank rating means *not rated yet*, which is different from a real 0. Saving recalculates the month's scores. There is no history of previous values.
 
 ### 6.6 Report cards (PDFs)
 
-A report card can come from three places. When someone downloads one (`/api/report-card`), the server picks the first that applies:
+When someone downloads a card (`/api/report-card`) the server picks the first that applies:
 
-1. **A saved PDF** stored as base64 text inside `src/data/` (one set for July, one for August 2026). These were created outside the app.
-2. **A freshly generated PDF**, drawn by `pdf-lib` in `lib/cron/report-pdf.server.ts`: a navy and gold header, name and role, final score and RAG, ranks, the weighted breakdown, criteria, attendance and a note.
-3. Access rule: admins may download anyone's card; everyone else only their own.
+1. **A hand-made PDF** stored as base64 text in `src/data/` (July and August 2026, created outside the app).
+2. **The stored PDF** for a *finalized* month, exactly as it was when the month was locked.
+3. **A freshly generated PDF** (`src/lib/report/report-card.server.ts`), laid out like the July cards: score-proportional top bar, final-score box with a 0 / 60 / 75 / 100 gauge, "How this score was built" bars each with a one-line explanation, KRA rating dots with "NOT YET RATED" chips, "Why this score", "What to improve next month", and an optional evidence page (attendance calendar and graded DPR days).
+4. Access rule: admins may download anyone's card; everyone else only their own.
+
+The dashboard's employee panel and the PDF are drawn from the **same model** (`ScoreCardModel`, `src/lib/scoring/score-card.ts`), so they cannot disagree.
 
 ### 6.7 The AI assistant
 
@@ -242,15 +270,30 @@ Admins can ask questions in the chat box. The server loads the dashboard data, s
 
 ## 7. How scores are calculated
 
-**The app does not calculate the section scores.** The spreadsheet does. Each employee has a "TOTAL" row on their KRA tab, and the app reads figures from that row and applies fixed weights.
+**The backend now calculates every score** (`src/lib/scoring/`, pure and unit-tested). It is a direct port of the formulas in the old KRA sheet, plus two changes: a transparent raw-attendance blend, and a work-visibility penalty. Months scored in the old sheet (July, August 2026) are kept exactly as saved.
+
+**Inputs:** (1) attendance from the biometric upload, (2) the monthly Claude audit (DPR days graded, designer coordination, activity days), (3) director ratings entered in the dashboard. Scores recompute automatically whenever any of them changes and show **Pending** (naming what is missing) until all are in. An admin presses **Finalize month** to freeze the scores and store the report cards; **Reopen** undoes it.
+
+**Raw attendance** = 70% presence + 20% hours + 10% punctuality.
+- Presence: days attended (present, half day or missing punch) ÷ working days (calendar days minus Sundays).
+- Hours: average worked hours on attended days ÷ 9, capped at 100%.
+- Punctuality: share of attended days arriving by the shift's start time plus grace (`shift_rules` table, seeded 10:00 + 15 minutes for every shift).
+
+**Work-visibility rule.** A day counts as visible only if the person was present *and* left a real update that day. Adjusted attendance = raw × (visible days ÷ present days). Supervisors: a non-blank DPR filed that day (a DPR filed on a day off offsets nothing; blank templates do not count). Designers and EA: Rdash activity days if the audit supplies them, never below 50%; no data means no penalty.
+
+**Section scores**
+- DPR Combined = coverage × 40% + quality × 60% (coverage = distinct filing days ÷ working days; quality = average of Excellent 100 / Good 75 / Partial 50 / Poor 25).
+- Coordination (designers) = share of revision/markup tasks closed, from the audit.
+- System Work Feedback = Σ(weight × rating) ÷ 5 × 100. An unrated parameter counts as 0, and the score stays Pending until every parameter is rated.
 
 | Role group | Attendance | DPR Combined | Coordination | System Work Feedback |
 |---|---|---|---|---|
-| **Supervisor** | 30% (discipline-adjusted) | 50% | – | 20% |
+| **Supervisor** | 30% (visibility-adjusted) | 50% | – | 20% |
 | **Designer** | 25% | – | 40% | 35% |
+| **Designer, no coordination tasks** | 50% | – | – | 50% |
 | **Executive Assistant (EA)** | 60% | – | – | 40% |
 
-Any role that is not "supervisor" or "designer" is treated as EA. There is no separate formula for other roles.
+Ranks are within the role group (all designers together) and company-wide; Top 3 is overall rank 1 to 3.
 
 **Red / yellow / green** (from the final score):
 
@@ -260,12 +303,7 @@ Any role that is not "supervisor" or "designer" is treated as EA. There is no se
 | YELLOW — on track | 60% up to 75% |
 | GREEN — strong | 75% or above |
 
-**What the section names mean** (as described in the report cards; the actual formulas live in the Sheet):
-
-- **DPR** = Daily Progress Report filed by supervisors. *DPR Combined* blends coverage (share of working days with a report) and quality (how useful the reports were).
-- **Discipline-adjusted attendance** reduces attendance when someone was present but did not file a DPR.
-- **Coordination** (designers) is roughly the share of revision tasks completed during the month.
-- **System Work Feedback** is the manager's 1–5 ratings converted to a percentage.
+The exact payload the Claude task must post, and the updated task prompt, are in `docs/claude-monthly-audit-prompt.md`.
 
 ---
 
@@ -309,7 +347,20 @@ The app finds columns by their **header text** and by fixed cell ranges, so rena
 |---|---|
 | `allowed_emails` | Who may sign in and with what role (`admin`, `manager`, `employee`), plus the matching employee ID and name. Row-level security lets a user read only their own row. |
 | `monthly_director_ratings` | One row per month and employee: a 0–100 director rating and notes. Admin-only access. |
+| `employees` | The roster: id (`DLB-SUP-01`), name, role, group, department, manager, biometric id (`cosec_id`). Seeded by the migration. |
+| `employee_aliases` | Other spellings of a name (`sushovan haldar` maps to Susovan Haldar). |
+| `attendance_exclusions` | Biometric ids ignored entirely (the driver). |
+| `attendance_uploads` | One row per uploaded file: format, detected period and months, status, parse statistics, who uploaded. The raw file is in the `attendance-uploads` Storage bucket. |
+| `attendance_records` | One row per person per day: punches, half-day codes, normalised status, late/early/work minutes, manual-entry flag and reason. Unique on (date, biometric id). |
+| `monthly_scores` | One row per employee per month: final score, RAG, ranks, breakdown, criteria, audit details. Filled by the Claude audit (`/api/public/rdash-ingest`) or the one-off legacy import. |
+| `jobs` | The background job queue. |
 | `monthly_director_rating_details` | One row per month, employee and KRA parameter: rating 1–5, weight, weighted score, source tab, notes. Admin-only access. |
+
+All of the new tables are server-only (row-level security on, no policies). After applying the migration, regenerate `src/integrations/supabase/types.ts`; until then the code reaches these tables through an untyped client.
+
+**Moving July and August out of the old spreadsheet snapshots:** after the migration, run `npm run import:legacy -- --dry-run`, then `npm run import:legacy`. It is safe to repeat: it never overwrites existing scores and leaves any month that already has attendance alone.
+
+**Claude audit and the backend.** `POST /api/public/rdash-ingest` stores the payload and also writes each person's score into `monthly_scores` (matched by name or alias), so the dashboard shows it. `GET /api/public/attendance-summary?month=September 2026` (same `x-ingest-key`) returns every person's present, half, absent and leave days, average hours and punctuality, so the audit no longer needs an `attendance_summary.json`.
 
 Supabase Auth manages the actual accounts and passwords. The `supabase/migrations/` folder holds the structure, in order. Nothing applies these migrations automatically — they are run by hand.
 
@@ -387,7 +438,8 @@ Being upfront about these so nobody is surprised.
   ```
 
 **Uploads**
-- **The attendance card asks for a PDF, but the processor rejects PDFs.** Every attendance upload from the current UI ends as `FAILED` with a message asking for a CSV or Google Sheet.
+- The PDF carries clock times without dates, so a night-shift punch that belongs to the previous evening is placed on the row's own date. The Excel export has real dates, so prefer it. Both formats are tested to produce identical records otherwise.
+- A month has no score until a Claude audit for it is posted (or the legacy import ran). Attendance figures show immediately.
 
 **Access**
 - Signup is closed by default; set `ACCESS_OPEN_SIGNUPS=true` to let any confirmed account in as an employee.
@@ -397,7 +449,7 @@ Being upfront about these so nobody is surprised.
 - Director ratings are overwritten in place. There is no edit history.
 
 **Operations**
-- No automated tests, no CI, one lockfile (`pnpm-lock.yaml`), and migrations are applied by hand.
+- Tests: `npm test` runs the parsers on real sample files, name matching, the migration and queue on an in-process Postgres, the legacy import and the full upload-to-dashboard flow. No CI yet. One lockfile (`pnpm-lock.yaml`); migrations are applied by hand.
 
 ---
 

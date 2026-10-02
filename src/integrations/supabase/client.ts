@@ -27,6 +27,32 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 
+const REMEMBER_KEY = 'decorlab-remember-me';
+
+/** "Remember me" on the sign-in page: persistent (localStorage) or until the browser closes (sessionStorage). Defaults to remembered. */
+export function setRememberMe(remember: boolean) {
+  localStorage.setItem(REMEMBER_KEY, String(remember));
+}
+
+const sessionStore =
+  typeof window !== 'undefined'
+    ? {
+        getItem: (key: string) => localStorage.getItem(key) ?? sessionStorage.getItem(key),
+        setItem: (key: string, value: string) => {
+          const [use, other] =
+            localStorage.getItem(REMEMBER_KEY) === 'false'
+              ? [sessionStorage, localStorage]
+              : [localStorage, sessionStorage];
+          use.setItem(key, value);
+          other.removeItem(key);
+        },
+        removeItem: (key: string) => {
+          localStorage.removeItem(key);
+          sessionStorage.removeItem(key);
+        },
+      }
+    : undefined;
+
 function createSupabaseClient() {
   // Use import.meta.env for client-side (Vite build-time replacement)
   // Fall back to process.env for SSR (server-side rendering)
@@ -48,7 +74,7 @@ function createSupabaseClient() {
       fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY),
     },
     auth: {
-      storage: typeof window !== 'undefined' ? localStorage : undefined,
+      storage: sessionStore,
       persistSession: true,
       autoRefreshToken: true,
     }

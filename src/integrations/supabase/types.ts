@@ -15,6 +15,7 @@ export type Database = {
           employee_id: string | null;
           employee_name: string | null;
           id: string;
+          position: string | null;
           role: Database["public"]["Enums"]["access_role"];
         };
         Insert: {
@@ -23,6 +24,7 @@ export type Database = {
           employee_id?: string | null;
           employee_name?: string | null;
           id?: string;
+          position?: string | null;
           role?: Database["public"]["Enums"]["access_role"];
         };
         Update: {
@@ -31,6 +33,7 @@ export type Database = {
           employee_id?: string | null;
           employee_name?: string | null;
           id?: string;
+          position?: string | null;
           role?: Database["public"]["Enums"]["access_role"];
         };
         Relationships: [];

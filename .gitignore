@@ -35,3 +35,7 @@ google-service-account.json
 
 .env
 .env.local
+
+# Real people lists (contain personal emails); only the example is tracked
+scripts/*.csv
+!scripts/people.example.csv

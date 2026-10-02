@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { setRememberMe, supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,14 +33,8 @@ function formatAuthError(error: unknown): string {
   const message = error instanceof Error ? error.message : "Authentication failed";
   const normalized = message.toLowerCase();
 
-  if (normalized.includes("email not confirmed")) {
-    return "Your email is not confirmed yet. Confirm the email from Supabase, then sign in again. If it did not arrive, use Resend verification email.";
-  }
-  if (normalized.includes("rate limit") || normalized.includes("too many requests")) {
-    return "Supabase has temporarily rate-limited email delivery. Stop retrying and contact the administrator, or try again later.";
-  }
   if (normalized.includes("invalid login credentials")) {
-    return "The email or password is incorrect. If this is a new account, confirm your email before signing in.";
+    return "The email or password is incorrect. Accounts are created by your administrator; contact them if you cannot sign in.";
   }
   if (normalized.includes("redirect") && normalized.includes("not allowed")) {
     return "The authentication redirect is not configured for this site. Contact the administrator so the production URL can be added in Supabase.";
@@ -53,9 +47,8 @@ function AuthPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [resendBusy, setResendBusy] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -69,63 +62,17 @@ function AuthPage() {
     const normalizedEmail = email.trim().toLowerCase();
 
     try {
-      if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: normalizedEmail,
-          password,
-        });
-        if (error) throw error;
-        navigate({ to: "/dashboard" });
-      } else {
-        const { data, error } = await supabase.auth.signUp({
-          email: normalizedEmail,
-          password,
-          options: { emailRedirectTo: `${window.location.origin}/dashboard` },
-        });
-        if (error) throw error;
-
-        if (data.session) {
-          toast.success("Account created", {
-            description: "Your session is active. Opening the dashboard.",
-          });
-          navigate({ to: "/dashboard" });
-          return;
-        }
-
-        toast.success("Account created", {
-          description:
-            "Confirm the email before signing in. If it does not arrive, return here and use Resend verification email.",
-        });
-        setMode("signin");
-      }
+      setRememberMe(remember);
+      const { error } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      });
+      if (error) throw error;
+      navigate({ to: "/dashboard" });
     } catch (err) {
       toast.error(formatAuthError(err));
     } finally {
       setBusy(false);
-    }
-  };
-
-  const resendVerification = async () => {
-    const targetEmail = email.trim().toLowerCase();
-    if (!targetEmail) {
-      toast.error("Enter the account email first.");
-      return;
-    }
-    setResendBusy(true);
-    try {
-      const { error } = await supabase.auth.resend({
-        type: "signup",
-        email: targetEmail,
-        options: { emailRedirectTo: `${window.location.origin}/dashboard` },
-      });
-      if (error) throw error;
-      toast.success("Verification email sent", {
-        description: `Check the inbox for ${targetEmail}.`,
-      });
-    } catch (err) {
-      toast.error(formatAuthError(err));
-    } finally {
-      setResendBusy(false);
     }
   };
 
@@ -142,7 +89,7 @@ function AuthPage() {
             Decor<span className="text-gold-gradient">lab</span> HR
           </h1>
           <p className="mt-1 text-xs text-muted-foreground">
-            Account creation is open. Admin or employee-record access is assigned separately.
+            Sign in with the email your administrator registered for you.
           </p>
         </div>
         <form onSubmit={onSubmit} className="space-y-4">
@@ -163,42 +110,25 @@ function AuthPage() {
               id="password"
               type="password"
               required
-              minLength={6}
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="h-3.5 w-3.5 accent-primary"
+            />
+            Remember me on this device
+          </label>
           <Button type="submit" variant="gold" className="w-full" disabled={busy}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {mode === "signin" ? "Sign in" : "Create account"}
+            Sign in
           </Button>
         </form>
-        {mode === "signin" ? (
-          <button
-            type="button"
-            className="mt-3 w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-primary hover:underline disabled:opacity-50"
-            disabled={resendBusy}
-            onClick={resendVerification}
-          >
-            {resendBusy ? "Sending verification email…" : "Resend verification email"}
-          </button>
-        ) : (
-          <p className="mt-3 text-center text-xs text-muted-foreground">
-            You can create an account and sign in immediately. New accounts start with a default
-            employee view; contact the administrator if you need an employee record or manager/admin
-            access.
-          </p>
-        )}
-        <button
-          type="button"
-          className="mt-4 w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
-          onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-        >
-          {mode === "signin"
-            ? "First time? Create your account"
-            : "Already have an account? Sign in"}
-        </button>
       </div>
     </main>
   );

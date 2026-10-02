@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ScoreRing } from "./ScoreRing";
 import { AttendanceHeatmap } from "./AttendanceHeatmap";
 import { ActivitySection } from "./ActivitySection";
+import { ScoreCardView } from "./ScoreCardView";
 import { initialsOf, ragLabel, type Employee } from "@/lib/hr-types";
 
 const SEGMENT_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-4)"];
@@ -60,22 +61,47 @@ export function EmployeeDetail({
               <ScoreRing score={employee.score} rag={employee.rag} />
               <div className="min-w-[180px] flex-1 space-y-1 text-sm">
                 <p className="font-medium">
-                  {ragLabel(employee.rag)} — {employee.score}%
+                  {employee.score === null ? ragLabel(null) : `${ragLabel(employee.rag)} — ${employee.score}%`}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Rank in role {employee.rankInRole ?? "—"} · Overall {employee.overallRank ?? "—"}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  Avg {employee.avgHours}h/day · punctuality{" "}
-                  {employee.punctualityDeviation >= 0 ? "+" : ""}
-                  {employee.punctualityDeviation} min
-                </p>
+                {employee.hasAttendance ? (
+                  <p className="text-xs text-muted-foreground">
+                    {employee.presentDays} present
+                    {employee.halfDays ? ` (${employee.halfDays} half days)` : ""} · {employee.absentDays} absent
+                    {employee.leaveDays ? ` · ${employee.leaveDays} on leave` : ""} · avg {employee.avgHours}h/day ·
+                    punctuality {employee.punctualityDeviation >= 0 ? "+" : ""}
+                    {employee.punctualityDeviation} min
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">No attendance has been uploaded for this month yet.</p>
+                )}
                 {employee.note ? (
                   <p className="text-xs text-muted-foreground">{employee.note}</p>
                 ) : null}
               </div>
             </div>
 
+            {employee.card ? (
+              <section className="space-y-3 rounded-xl border border-primary/20 bg-secondary/20 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-primary" />
+                    <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                      Report card · {month}
+                    </h4>
+                  </div>
+                  <ReportCardDownloadButton
+                    path={`/api/report-card?name=${encodeURIComponent(employee.name)}&month=${encodeURIComponent(month)}`}
+                    filename={`${employee.name} - ${month} Report Card.pdf`}
+                  />
+                </div>
+                <ScoreCardView card={employee.card} />
+              </section>
+            ) : null}
+
+            {!employee.card && employee.breakdown.length ? (
             <section className="space-y-2">
               <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 Weighted score breakdown
@@ -112,6 +138,7 @@ export function EmployeeDetail({
                 ))}
               </ul>
             </section>
+            ) : null}
 
             {employee.reportCard ? (
               <section className="space-y-4 rounded-xl border border-primary/20 bg-secondary/20 p-4">
