@@ -11,12 +11,15 @@ import { SummaryStrip } from "@/components/dashboard/SummaryStrip";
 import { EmployeeCard } from "@/components/dashboard/EmployeeCard";
 import { EmployeeDetail } from "@/components/dashboard/EmployeeDetail";
 import { AttendanceSection } from "@/components/dashboard/AttendanceSection";
+import { AttendanceViewer } from "@/components/dashboard/AttendanceViewer";
+import { fetchDashboard } from "@/components/dashboard/fetch-dashboard";
 import { TrendSection } from "@/components/dashboard/TrendSection";
-import { CreateReportButton } from "@/components/dashboard/CreateReportButton";
+import { MonthActions } from "@/components/dashboard/MonthActions";
 import { UploadAttendanceCard } from "@/components/dashboard/UploadAttendanceCard";
 import { UploadWhatsAppCard } from "@/components/dashboard/UploadWhatsAppCard";
 import { AskTeamChat } from "@/components/dashboard/AskTeamChat";
 import { AdminAccessPanel } from "@/components/dashboard/AdminAccessPanel";
+import { ClaudeIngestCard } from "@/components/dashboard/ClaudeIngestCard";
 import { DirectorRatingsPanel } from "@/components/dashboard/DirectorRatingsPanel";
 import { AppShell, navForRole } from "@/components/dashboard/AppShell";
 
@@ -55,7 +58,8 @@ function useSectionRefs(_ids: string[]) {
 
 function DashboardPage() {
   const navigate = useNavigate();
-  const [selectedMonth, setSelectedMonth] = useState("July 2026");
+  // "" means "the latest month that has data"; the server decides, so nothing here is hardcoded.
+  const [selectedMonth, setSelectedMonth] = useState("");
   const [activeNav, setActiveNav] = useState("overview");
   const {
     data: view,
@@ -65,19 +69,7 @@ function DashboardPage() {
     isFetching,
   } = useQuery<DashboardView>({
     queryKey: ["hr-dashboard", selectedMonth],
-    queryFn: async () => {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      if (!token) throw new Error("Your session has expired. Please sign in again.");
-      const response = await fetch(`/api/dashboard?month=${encodeURIComponent(selectedMonth)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(payload?.message ?? payload?.error ?? "Could not load the dashboard.");
-      }
-      return payload as DashboardView;
-    },
+    queryFn: () => fetchDashboard(selectedMonth),
     staleTime: 60_000,
   });
 
@@ -86,8 +78,10 @@ function DashboardPage() {
     navigate({ to: "/auth" });
   };
 
-  const role = view?.viewerRole ?? "employee";
-  const nav = navForRole(role);
+  // Never guess a role: until the server has answered (or if it fails) the role is unknown, so the
+  // page must not claim to be the employee view for an administrator.
+  const role = view?.viewerRole ?? null;
+  const nav = role ? navForRole(role) : [];
   const isManager = role === "manager";
   const isEmployee = role === "employee";
   const month = view ? (view.viewerRole === "admin" ? view.data.month : view.month) : "—";
@@ -118,21 +112,20 @@ function DashboardPage() {
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
           <span className="sr-only">Report month</span>
           <select
-            value={selectedMonth}
+            value={view.data.month}
             onChange={(event) => setSelectedMonth(event.target.value)}
             className="h-9 rounded-md border border-border bg-background px-3 text-xs font-medium text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
           >
-            {(view.data.months.length ? view.data.months : ["July 2026", "August 2026"]).map(
-              (option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ),
-            )}
+            {view.data.monthInfo.map((m) => (
+              <option key={m.month} value={m.month}>
+                {m.month}
+                {m.hasAttendance || m.hasScores ? "" : " — no data yet"}
+              </option>
+            ))}
           </select>
         </label>
       ) : null}
-      {view?.viewerRole === "admin" ? <CreateReportButton month={view.data.month} /> : null}
+      {view?.viewerRole === "admin" ? <MonthActions month={view.data.month} locked={view.data.locked} /> : null}
     </>
   );
 
@@ -141,7 +134,7 @@ function DashboardPage() {
       <AppShell
         role={role}
         title={title}
-        subtitle={`Review period: ${month} · live from the HR spreadsheet`}
+        subtitle={`Review period: ${month} · live from the Decorlab database`}
         nav={nav}
         activeNav={activeNav}
         onNavChange={setActiveNav}
@@ -183,7 +176,7 @@ function DashboardPage() {
         ) : view?.viewerRole === "employee" ? (
           <EmployeeSelfView month={view.month} employee={view.employee} />
         ) : view ? (
-          <LeadershipView data={view.data} selectedMonth={selectedMonth} />
+          <LeadershipView data={view.data} />
         ) : null}
       </AppShell>
     </div>
@@ -321,7 +314,10 @@ function ManagerView({
           Attendance &amp; uploads
         </h2>
         <section className="grid gap-4 lg:grid-cols-2">
-          <UploadAttendanceCard months={months} />
+          <UploadAttendanceCard
+            roster={roster.map((r) => ({ id: r.id, name: r.name }))}
+            canResolve={false}
+          />
           <UploadWhatsAppCard months={months} />
         </section>
       </div>
@@ -377,7 +373,7 @@ function EmployeeSelfView({ employee, month }: { employee: Employee | null; mont
   );
 }
 
-function LeadershipView({ data, selectedMonth }: { data: DashboardData; selectedMonth: string }) {
+function LeadershipView({ data }: { data: DashboardData }) {
   const [selected, setSelected] = useState<Employee | null>(null);
   const [filter, setFilter] = useState<"ALL" | "RED" | "YELLOW" | "GREEN">("ALL");
   const { setRef } = useSectionRefs(["overview", "team", "attendance", "trends", "access"]);
@@ -387,7 +383,7 @@ function LeadershipView({ data, selectedMonth }: { data: DashboardData; selected
       .filter((e) => filter === "ALL" || e.rag === filter)
       .sort(
         (a, b) =>
-          ROLE_ORDER.indexOf(a.roleGroup) - ROLE_ORDER.indexOf(b.roleGroup) || b.score - a.score,
+          ROLE_ORDER.indexOf(a.roleGroup) - ROLE_ORDER.indexOf(b.roleGroup) || (b.score ?? -1) - (a.score ?? -1),
       );
   }, [data, filter]);
 
@@ -440,9 +436,13 @@ function LeadershipView({ data, selectedMonth }: { data: DashboardData; selected
 
         <div ref={setRef("attendance")} id="attendance" className="scroll-mt-24 space-y-6">
           <section className="grid gap-4 lg:grid-cols-2">
-            <UploadAttendanceCard months={data.months} />
+            <UploadAttendanceCard
+              roster={data.employees.map((e) => ({ id: e.id, name: e.name }))}
+              canResolve
+            />
             <UploadWhatsAppCard months={data.months} />
           </section>
+          <AttendanceViewer data={data} />
           <section className="space-y-3">
             <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               Attendance &amp; punctuality
@@ -456,8 +456,9 @@ function LeadershipView({ data, selectedMonth }: { data: DashboardData; selected
         </div>
 
         <div ref={setRef("access")} id="access" className="scroll-mt-24 space-y-6">
+          <ClaudeIngestCard />
           <AdminAccessPanel />
-          <DirectorRatingsPanel selectedMonth={selectedMonth} />
+          <DirectorRatingsPanel selectedMonth={data.month} locked={Boolean(data.locked)} />
         </div>
 
         <footer className="panel flex flex-wrap items-center gap-4 p-4 text-xs text-muted-foreground">

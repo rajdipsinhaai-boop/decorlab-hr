@@ -4,11 +4,13 @@ import { initialsOf, ragLabel, type Employee } from "@/lib/hr-types";
 
 export function EmployeeCard({ employee, onOpen }: { employee: Employee; onOpen: () => void }) {
   const ragTone =
-    employee.rag === "GREEN"
-      ? "text-success"
-      : employee.rag === "YELLOW"
-        ? "text-warning"
-        : "text-danger";
+    employee.rag === null
+      ? "text-muted-foreground"
+      : employee.rag === "GREEN"
+        ? "text-success"
+        : employee.rag === "YELLOW"
+          ? "text-warning"
+          : "text-danger";
   return (
     <button
       type="button"
@@ -18,11 +20,13 @@ export function EmployeeCard({ employee, onOpen }: { employee: Employee; onOpen:
       <span
         aria-hidden
         className={`absolute inset-x-0 top-0 h-0.5 ${
-          employee.rag === "GREEN"
-            ? "bg-success"
-            : employee.rag === "YELLOW"
-              ? "bg-warning"
-              : "bg-danger"
+          employee.rag === null
+            ? "bg-border"
+            : employee.rag === "GREEN"
+              ? "bg-success"
+              : employee.rag === "YELLOW"
+                ? "bg-warning"
+                : "bg-danger"
         }`}
       />
       <div className="flex items-start gap-4">
@@ -36,14 +40,16 @@ export function EmployeeCard({ employee, onOpen }: { employee: Employee; onOpen:
           </div>
           <p className="truncate text-xs text-muted-foreground">{employee.role}</p>
           <p className={`mt-2 text-sm font-medium ${ragTone}`}>
-            {ragLabel(employee.rag)} — {employee.score}%
+            {employee.score === null ? ragLabel(null) : `${ragLabel(employee.rag)} — ${employee.score}%`}
           </p>
         </div>
         <ScoreRing score={employee.score} rag={employee.rag} size={72} stroke={7} />
       </div>
       <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
         <span>
-          {employee.presentDays} present · {employee.absentDays} absent
+          {employee.hasAttendance
+            ? `${employee.presentDays} present${employee.halfDays ? ` (${employee.halfDays} half)` : ""} · ${employee.absentDays} absent`
+            : "No attendance uploaded yet"}
         </span>
         <span className="inline-flex items-center gap-1 text-primary opacity-0 transition-opacity group-hover:opacity-100">
           Details <ChevronRight className="h-3.5 w-3.5" />

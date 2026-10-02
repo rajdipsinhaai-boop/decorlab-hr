@@ -63,7 +63,8 @@ export function AppShell({
   headerActions,
   children,
 }: {
-  role: ViewerRole;
+  /** null while the server has not yet confirmed who the viewer is (or the request failed). */
+  role: ViewerRole | null;
   title: ReactNode;
   subtitle?: ReactNode;
   nav: NavItem[];
@@ -73,7 +74,9 @@ export function AppShell({
   children: ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const meta = ROLE_META[role];
+  const meta = role
+    ? ROLE_META[role]
+    : { label: "Checking access…", tone: "border-border bg-muted/30 text-muted-foreground" };
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] gap-0 px-0 lg:gap-6 lg:px-6">

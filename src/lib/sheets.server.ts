@@ -3,7 +3,6 @@ import { googleJson } from "./google-auth.server";
 export const SPREADSHEET_ID =
   process.env.GOOGLE_SHEET_ID ?? "11gz8_k0o12efp-Mh2rhQZGCOl0ZcksgEDpo0QpqLNCs";
 
-export const SCHEDULED_START_MINUTES = 10 * 60;
 export type Grid = string[][];
 
 const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";

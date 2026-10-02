@@ -2,13 +2,8 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import type { DashboardData } from "@/lib/hr-types";
 
 export function TrendSection({ data }: { data: DashboardData }) {
-  const points = data.months.map((m) => ({
-    month: m,
-    average:
-      Math.round(
-        (data.employees.reduce((a, e) => a + e.score, 0) / Math.max(1, data.employees.length)) * 10,
-      ) / 10,
-  }));
+  // One point per month that has been scored, computed server-side from each month's own scores.
+  const points = data.trend;
 
   return (
     <section className="panel p-4 sm:p-5">

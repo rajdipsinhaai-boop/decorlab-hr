@@ -1,9 +1,10 @@
 import type { AttendanceDay } from "@/lib/hr-types";
 
 function toneOf(status: string) {
-  if (/week off|weekoff|off/i.test(status)) return "bg-muted text-muted-foreground";
+  if (/week off|weekoff|holiday|^off/i.test(status)) return "bg-muted text-muted-foreground";
+  if (/leave/i.test(status)) return "bg-primary/25 text-foreground";
   if (/absent/i.test(status)) return "bg-danger/80 text-danger-foreground";
-  if (/incomplete/i.test(status)) return "bg-warning/80 text-warning-foreground";
+  if (/incomplete|half/i.test(status)) return "bg-warning/80 text-warning-foreground";
   if (/present/i.test(status)) return "bg-success/80 text-success-foreground";
   return "bg-secondary text-muted-foreground";
 }
@@ -33,10 +34,13 @@ export function AttendanceHeatmap({ days }: { days: AttendanceDay[] }) {
           <i className="h-2.5 w-2.5 rounded-sm bg-danger/80" /> Absent
         </span>
         <span className="flex items-center gap-1.5">
-          <i className="h-2.5 w-2.5 rounded-sm bg-warning/80" /> Incomplete
+          <i className="h-2.5 w-2.5 rounded-sm bg-warning/80" /> Half day / incomplete
         </span>
         <span className="flex items-center gap-1.5">
-          <i className="h-2.5 w-2.5 rounded-sm bg-muted" /> Week off
+          <i className="h-2.5 w-2.5 rounded-sm bg-primary/25" /> Leave
+        </span>
+        <span className="flex items-center gap-1.5">
+          <i className="h-2.5 w-2.5 rounded-sm bg-muted" /> Week off / holiday
         </span>
       </div>
     </div>

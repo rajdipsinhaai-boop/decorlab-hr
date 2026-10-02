@@ -36,18 +36,25 @@ function Stat({
 
 export function SummaryStrip({ employees }: { employees: Employee[] }) {
   const total = employees.length;
-  const avg = total ? employees.reduce((a, e) => a + e.score, 0) / total : 0;
+  // Averages, ranks and callouts only make sense for people who have been scored this month.
+  const scored = employees.filter((e): e is Employee & { score: number } => e.score !== null);
+  const avg = scored.length ? scored.reduce((a, e) => a + e.score, 0) / scored.length : null;
   const green = employees.filter((e) => e.rag === "GREEN").length;
   const yellow = employees.filter((e) => e.rag === "YELLOW").length;
   const red = employees.filter((e) => e.rag === "RED").length;
-  const sorted = [...employees].sort((a, b) => b.score - a.score);
+  const sorted = [...scored].sort((a, b) => b.score - a.score);
   const top = sorted[0];
   const bottom = sorted[sorted.length - 1];
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
       <Stat label="Employees" value={String(total)} icon={<Users className="h-4 w-4" />} />
-      <Stat label="Average score" value={`${avg.toFixed(1)}%`} icon={<Gauge className="h-4 w-4" />} />
+      <Stat
+        label="Average score"
+        value={avg === null ? "—" : `${avg.toFixed(1)}%`}
+        sub={avg === null ? "Not scored yet this month" : `${scored.length} of ${total} scored`}
+        icon={<Gauge className="h-4 w-4" />}
+      />
       <Stat label="Green ≥ 75%" value={String(green)} tone="green" />
       <Stat label="Yellow 60-75%" value={String(yellow)} tone="yellow" />
       <Stat label="Red < 60%" value={String(red)} tone="red" />

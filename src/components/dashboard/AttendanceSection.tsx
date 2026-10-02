@@ -33,13 +33,22 @@ export function AttendanceSection({ data }: { data: DashboardData }) {
     (e) => e.roleGroup === "supervisor" && e.filingDiscipline !== null,
   );
 
+  if (!data.employees.some((e) => e.hasAttendance)) {
+    return (
+      <div className="panel p-5 text-sm text-muted-foreground">
+        No attendance has been uploaded for {data.month} yet. Upload the monthly report above and these charts fill in
+        automatically.
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <section className="panel p-4 sm:p-5">
         <header className="mb-3">
           <h3 className="text-sm font-semibold">Punctuality deviation</h3>
           <p className="text-xs text-muted-foreground">
-            Average in-time vs. scheduled {data.scheduledStart} (minutes; positive = late)
+            Average in-time vs. scheduled start ({data.scheduledStart}); minutes, positive = late
           </p>
         </header>
         {filing.length ? (
@@ -47,7 +56,7 @@ export function AttendanceSection({ data }: { data: DashboardData }) {
             {filing.map((e) => (
               <span
                 key={e.id}
-                title={`${e.name}: DPR filing days ÷ present days`}
+                title={`${e.name}: days present with a visible update ÷ days present`}
                 className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${
                   (e.filingDiscipline ?? 0) >= 90
                     ? "border-success/30 bg-success/10 text-success"
@@ -56,7 +65,7 @@ export function AttendanceSection({ data }: { data: DashboardData }) {
                       : "border-danger/30 bg-danger/10 text-danger"
                 }`}
               >
-                {e.name.split(" ")[0]} · filing {e.filingDiscipline}%
+                {e.name.split(" ")[0]} · visible updates {e.filingDiscipline}%
               </span>
             ))}
           </div>
@@ -89,7 +98,7 @@ export function AttendanceSection({ data }: { data: DashboardData }) {
       <section className="panel p-4 sm:p-5">
         <header className="mb-3">
           <h3 className="text-sm font-semibold">Average hours worked</h3>
-          <p className="text-xs text-muted-foreground">Target {data.targetHours}h per working day</p>
+          <p className="text-xs text-muted-foreground">Required duty {data.targetHours}h per working day</p>
         </header>
         <div className="h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">

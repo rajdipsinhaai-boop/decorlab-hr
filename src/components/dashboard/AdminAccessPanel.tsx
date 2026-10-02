@@ -22,6 +22,7 @@ export function AdminAccessPanel() {
   const [role, setRole] = useState<ViewerRole>("employee");
   const [employeeId, setEmployeeId] = useState("");
   const [employeeName, setEmployeeName] = useState("");
+  const [position, setPosition] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmingEmail, setConfirmingEmail] = useState<string | null>(null);
   const [confirmEmail, setConfirmEmail] = useState("");
@@ -42,6 +43,7 @@ export function AdminAccessPanel() {
           role,
           employeeId: employeeId || undefined,
           employeeName: employeeName || undefined,
+          position: position || undefined,
         },
       });
       toast.success("Access profile saved", {
@@ -50,6 +52,7 @@ export function AdminAccessPanel() {
       setEmail("");
       setEmployeeId("");
       setEmployeeName("");
+      setPosition("");
       await users.refetch();
     } catch (error) {
       toast.error("Could not save access profile", {
@@ -120,6 +123,14 @@ export function AdminAccessPanel() {
             placeholder="Exact Employee Master name"
           />
         </label>
+        <label className="space-y-1.5 text-xs text-muted-foreground">
+          Position
+          <Input
+            value={position}
+            onChange={(event) => setPosition(event.target.value)}
+            placeholder="Designer, Architect, Supervisor…"
+          />
+        </label>
         <Button type="submit" variant="gold" disabled={saving}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
           Save access
@@ -185,7 +196,7 @@ export function AdminAccessPanel() {
                   <td className="px-3 py-2 font-medium">{user.email}</td>
                   <td className="px-3 py-2 text-primary">{ROLE_LABEL[user.role] ?? user.role}</td>
                   <td className="px-3 py-2 text-muted-foreground">
-                    {user.employeeName || user.employeeId || "—"}
+                    {user.employeeName || user.employeeId || "—"}{user.position ? ` · ${user.position}` : ""}
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">
                     <Button
