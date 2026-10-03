@@ -71,7 +71,7 @@ export function AttendanceViewer({ data }: { data: DashboardData }) {
               <tr>
                 <th className="py-1.5 pr-2 font-medium">Employee</th>
                 <th className="px-2 font-medium">Present</th>
-                <th className="px-2 font-medium">Half</th>
+                <th className="px-2 font-medium">Hours</th>
                 <th className="px-2 font-medium">Absent</th>
                 <th className="px-2 font-medium">Leave</th>
                 <th className="px-2 font-medium">Avg hrs</th>
@@ -95,7 +95,7 @@ export function AttendanceViewer({ data }: { data: DashboardData }) {
                         <span className="ml-5 block text-[10px] text-muted-foreground">{e.role}</span>
                       </td>
                       <td className="px-2 tabular-nums">{e.presentDays}</td>
-                      <td className="px-2 tabular-nums">{e.halfDays}</td>
+                      <td className="px-2 tabular-nums">{e.totalHours}</td>
                       <td className="px-2 tabular-nums">{e.absentDays}</td>
                       <td className="px-2 tabular-nums">{e.leaveDays}</td>
                       <td className="px-2 tabular-nums">{fmt(e.avgHours)}</td>
@@ -118,7 +118,7 @@ export function AttendanceViewer({ data }: { data: DashboardData }) {
             </tbody>
           </table>
           <p className="mt-3 text-[11px] text-muted-foreground">
-            Present counts full days, half days and days with a missing punch. Punctuality is the average arrival
+            Present counts every day attended, including days with a missing punch; Hours is the time worked on them. Punctuality is the average arrival
             against each role's start time ({data.scheduledStart}), positive = late. Late arrivals are fine when the full 8h30 duty is completed.
           </p>
         </div>

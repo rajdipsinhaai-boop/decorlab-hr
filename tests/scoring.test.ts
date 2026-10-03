@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 // @ts-expect-error plain JS script, no type declarations
 import { buildLegacy } from "../scripts/import-legacy.mjs";
 import {
-  attendanceBlend,
+  attendanceHours,
   dprStats,
   managerStats,
   visibility,
@@ -78,48 +78,50 @@ const day = (date: string, over: Partial<AttDay> = {}): AttDay => ({
 });
 const dates = (n: number) => Array.from({ length: n }, (_, i) => `2026-09-${String(i + 1).padStart(2, "0")}`);
 
-describe("raw attendance = 70% presence + 20% hours + 10% punctuality", () => {
-  it("is 100 for a full, on-time, full-hours month", () => {
-    const b = attendanceBlend(dates(26).map((d) => day(d)), 26, RULES.designer);
-    expect(b.raw).toBe(100);
+describe("raw attendance = hours worked / (working days x 8h30)", () => {
+  const H = (n: number) => n * 60;
+  it("is 100 for a month of full days, and capped at 100 for overtime", () => {
+    expect(attendanceHours(dates(26).map((d) => day(d, { workMin: H(8.5) })), 26, RULES.designer).raw).toBe(100);
+    expect(attendanceHours(dates(26).map((d) => day(d, { workMin: H(10) })), 26, RULES.designer).raw).toBe(100);
   });
-  it("blends the three parts", () => {
-    // 20 of 26 days present, 9h each, all on time -> 0.7*0.769 + 0.2*1 + 0.1*1
-    const b = attendanceBlend(dates(20).map((d) => day(d)), 26, RULES.designer);
-    expect(b.presence).toBeCloseTo(20 / 26, 5);
-    expect(b.raw).toBeCloseTo(100 * (0.7 * (20 / 26) + 0.2 + 0.1), 1);
+  it("grades the hours against working days x 8.5", () => {
+    // 20 of 26 days at 8h30 = 170h of 221h expected
+    const b = attendanceHours(dates(20).map((d) => day(d, { workMin: H(8.5) })), 26, RULES.designer);
+    expect(b.workedHours).toBe(170);
+    expect(b.expectedHours).toBe(221);
+    expect(b.raw).toBeCloseTo((170 / 221) * 100, 1);
   });
-  it("penalises short days, and counts half days and missing punches as attended", () => {
-    const days = [
-      day("2026-09-01", { workMin: 6 * 60 }), // short day, arrived in time
-      day("2026-09-02", { inAt: "2026-09-02T11:30:00", workMin: 7 * 60 }), // late AND short -> not on time
-      day("2026-09-03", { status: "Half Day" }),
-      day("2026-09-04", { status: "Incomplete", workMin: null }),
-      day("2026-09-05", { status: "Absent", inAt: null, workMin: null }),
-    ];
-    const b = attendanceBlend(days, 5, RULES.designer);
-    expect(b.attendedDays).toBe(4);
-    expect(b.onTimeDays).toBe(3);
-    expect(b.punctualitySample).toBe(4);
-    expect(b.avgHours).toBe(7.3); // (6 + 7 + 9) / 3 days that have hours
+  it("ignores when you arrive: a late start made up in full scores the same as an on-time one", () => {
+    const onTime = attendanceHours([day("2026-09-01", { inAt: "2026-09-01T10:00:00", workMin: H(8.5) })], 1, RULES.designer);
+    const late = attendanceHours([day("2026-09-01", { inAt: "2026-09-01T12:30:00", workMin: H(8.5) })], 1, RULES.designer);
+    expect(late.raw).toBe(onTime.raw);
+    expect(late.raw).toBe(100);
   });
-  it("a late arrival is fine if the full 8h30 duty is completed", () => {
-    const late = (workMin: number) => attendanceBlend([day("2026-09-01", { inAt: "2026-09-01T11:40:00", workMin })], 1, RULES.designer);
-    expect(late(8 * 60 + 30).onTimeDays).toBe(1); // 11:40 is well past 10:30, but 8h30 was worked
-    expect(late(8 * 60 + 29).onTimeDays).toBe(0); // one minute short -> late
+  it("penalises a short day in proportion, and overtime on another day covers it", () => {
+    const short = attendanceHours([day("2026-09-01", { workMin: H(8.5) }), day("2026-09-02", { workMin: H(4.25) })], 2, RULES.designer);
+    expect(short.raw).toBe(75);
+    expect(short.shortDays).toBe(1);
+    expect(short.avgShortMin).toBe(255);
+    const covered = attendanceHours([day("2026-09-01", { workMin: H(12.75) }), day("2026-09-02", { workMin: H(4.25) })], 2, RULES.designer);
+    expect(covered.raw).toBe(100);
   });
-  it("gives everyone a 30-minute grace period (designers 10:30, supervisors 11:30)", () => {
-    const arrive = (role: RoleGroup, hhmm: string, workMin = 7 * 60) =>
-      attendanceBlend([day("2026-09-01", { inAt: `2026-09-01T${hhmm}:00`, workMin })], 1, RULES[role]).onTimeDays;
-    expect(arrive("designer", "10:30")).toBe(1);
-    expect(arrive("designer", "10:31")).toBe(0);
-    expect(arrive("supervisor", "11:30")).toBe(1);
-    expect(arrive("supervisor", "11:31")).toBe(0);
-    expect(arrive("supervisor", "10:00")).toBe(1); // early is always fine
+  it("counts hours only on days attended; absences and missing hours add nothing", () => {
+    const b = attendanceHours(
+      [
+        day("2026-09-01", { workMin: H(8.5) }),
+        day("2026-09-02", { status: "Incomplete", workMin: null }),
+        day("2026-09-03", { status: "Absent", inAt: null, workMin: null }),
+        day("2026-09-04", { status: "Week Off", workMin: H(5) }),
+      ],
+      4,
+      RULES.designer,
+    );
+    expect(b.attendedDays).toBe(2);
+    expect(b.workedHours).toBe(8.5);
+    expect(b.raw).toBe(25);
   });
-  it("treats missing hours or unreadable arrivals as neutral, not as a penalty", () => {
-    const b = attendanceBlend([day("2026-09-01", { workMin: null, inAt: null })], 1, RULES.designer);
-    expect(b.raw).toBe(100);
+  it("scores 0 when nobody attended", () => {
+    expect(attendanceHours([day("2026-09-01", { status: "Absent", inAt: null, workMin: null })], 26, RULES.designer).raw).toBe(0);
   });
 });
 
@@ -229,9 +231,9 @@ describe("computeScore", () => {
       ["feedback", 20],
     ]);
   });
-  it("applies the visibility penalty to the attendance part", () => {
+  it("applies the visibility penalty (once both warnings are used) to the attendance part", () => {
     const half = dates(26).map((d, i) => dpr(d, "Excellent", i % 2 === 1)); // every other report blank
-    const r = computeScore(base({ audit: audit({ dprDays: half }) }));
+    const r = computeScore(base({ audit: audit({ dprDays: half }), warningsUsedBefore: 2 }));
     expect(r.facts.visibilityFactor).toBe(0.5);
     expect(r.facts.adjustedAttendance).toBe(50);
     expect(r.components[0]!.note).toContain("visible on only 13 of 26");
@@ -254,24 +256,6 @@ describe("computeScore", () => {
   });
   it("EA: attendance x60 + feedback x40", () => {
     expect(computeScore(base({ role: "ea", audit: null })).final).toBe(Math.round(100 * 0.6 * 10 + 80 * 0.4 * 10) / 10);
-  });
-});
-
-describe("attendanceBlend", () => {
-  it("scores 0 when nobody attended, instead of paying out the neutral hours/punctuality parts", () => {
-    const rule = { startMin: 11 * 60, graceMin: 30, requiredMin: 510 };
-    const absent = attendanceBlend(
-      [{ workDate: "2026-09-01", status: "Absent", inAt: null, workMin: null }],
-      26,
-      rule,
-    );
-    expect(absent.raw).toBe(0);
-    const here = attendanceBlend(
-      [{ workDate: "2026-09-01", status: "Present", inAt: "2026-09-01T11:05:00", workMin: 510 }],
-      1,
-      rule,
-    );
-    expect(here.raw).toBe(100);
   });
 });
 
@@ -348,7 +332,7 @@ describe("short-day advice", () => {
   it("tells someone who keeps leaving before 8h30 to stay on after a late start", () => {
     const att = Array.from({ length: 20 }, (_, i) => {
       const date = `2026-09-${String(i + 1).padStart(2, "0")}`;
-      return { workDate: date, status: i < 12 ? "Half Day" : "Present", inAt: `${date}T11:40:00`, workMin: i < 12 ? 420 : 520 };
+      return { workDate: date, status: "Present", inAt: `${date}T11:40:00`, workMin: i < 12 ? 420 : 520 };
     });
     const ratings = [{ name: "A", weight: 1, rating: 4 }];
     const result = computeScore({ role: "supervisor", workingDays: 26, attendance: att, audit: null, ratings, rules: DEFAULT_DUTY_RULES });
@@ -359,17 +343,120 @@ describe("short-day advice", () => {
   });
 });
 
-describe("short days cost attendance", () => {
-  it("credits a day in proportion to the duty completed, and a late start that is made up in full", () => {
-    const day = (n: number, workMin: number | null): AttDay => ({
-      workDate: `2026-09-${String(n).padStart(2, "0")}`, status: "Present", inAt: `2026-09-${String(n).padStart(2, "0")}T12:00:00`, workMin,
+describe("leave and holidays are not held against anyone", () => {
+  it("takes leave days (and holidays) out of that person's working days, so the 8.5h target shrinks with them", async () => {
+    const { planMonthScores } = await import("@/lib/scoring/plan-month");
+    const att = (workDate: string, status: string, workMin: number | null) => ({ employeeId: "E1", workDate, status, inAt: null, workMin });
+    const plan = planMonthScores({
+      monthKey: "2026-09",
+      employees: [{ id: "E1", name: "A", role: "Designer", role_group: "designer" }],
+      attendance: [
+        att("2026-09-01", "Present", 510),
+        att("2026-09-02", "Leave", null),
+        att("2026-09-03", "Leave", null),
+        att("2026-09-18", "Absent", null), // on the holiday calendar
+      ],
+      ratings: [],
+      params: [],
+      audit: new Map(),
+      rules: DEFAULT_DUTY_RULES,
+      holidays: ["2026-09-18"],
     });
-    const full = attendanceBlend([day(1, 510), day(2, 600), day(3, 510), day(4, 510)], 4, RULES.designer);
-    expect(full.presence).toBe(1); // late in, 8h30+ worked: no penalty
-    const cut = attendanceBlend([day(1, 510), day(2, 255), day(3, 510), day(4, 510)], 4, RULES.designer);
-    expect(cut.creditDays).toBe(3.5); // one half-length day = half a day
-    expect(cut.presence).toBeCloseTo(0.875);
-    expect(cut.raw).toBeLessThan(full.raw);
-    expect(attendanceBlend([day(1, null)], 1, RULES.designer).presence).toBe(1); // no hours recorded: not judged
+    const facts = plan.rows[0]!.details["facts"] as { workingDays: number; leaveDays: number; expectedHours: number };
+    expect(facts.leaveDays).toBe(2);
+    expect(facts.workingDays).toBe(25 - 2); // 30 days - 4 Sundays - 1 holiday - 2 leave
+    expect(facts.expectedHours).toBe(23 * 8.5);
+  });
+});
+
+describe("two warnings a year for missed updates", () => {
+  const input = (warningsUsedBefore: number): ScoreInput => ({
+    role: "supervisor",
+    workingDays: 26,
+    attendance: dates(26).map((d) => day(d)),
+    // updates on only 13 of the 26 days present
+    audit: audit({ dprDays: dates(13).map((d) => dpr(d, "Excellent")) }),
+    ratings: [{ name: "A", weight: 1, rating: 4 }],
+    rules: DEFAULT_DUTY_RULES,
+    warningsUsedBefore,
+  });
+  it("uses a warning and leaves attendance alone, and says so in the report", () => {
+    const r = computeScore(input(0));
+    expect(r.facts.warningUsed).toBe(true);
+    expect(r.facts.warningsLeft).toBe(1);
+    expect(r.facts.adjustedAttendance).toBe(r.facts.rawAttendance); // not reduced
+    const att = r.components.find((c) => c.key === "attendance")!;
+    expect(att.note).toContain("one of your 2 yearly warnings was used");
+    const { why } = buildNarrative("supervisor", r, [{ name: "A", weight: 1, rating: 4 }], input(0).audit);
+    expect(why[0]).toContain("Warning used");
+    expect(why[0]).toContain("1 left this year");
+  });
+  it("uses the second warning too", () => {
+    const r = computeScore(input(1));
+    expect(r.facts).toMatchObject({ warningUsed: true, warningsLeft: 0 });
+    expect(r.facts.adjustedAttendance).toBe(r.facts.rawAttendance);
+  });
+  it("once both are used, the visibility penalty applies as before", () => {
+    const r = computeScore(input(2));
+    expect(r.facts.warningUsed).toBe(false);
+    expect(r.facts.adjustedAttendance).toBe(Math.round(r.facts.rawAttendance * 0.5 * 10) / 10);
+    expect(r.components.find((c) => c.key === "attendance")!.note).toContain("both yearly warnings are already used");
+  });
+  it("costs no warning when updates were filed on every day present", () => {
+    const full: ScoreInput = { ...input(0), audit: audit({ dprDays: dates(26).map((d) => dpr(d, "Good")) }) };
+    expect(computeScore(full).facts).toMatchObject({ warningUsed: false, warningsLeft: 2 });
+  });
+});
+
+describe("warnings across months", () => {
+  it("counts down 2 -> 1 -> 0, penalises the third miss, and a recompute never spends one twice", async () => {
+    const { planMonthScores } = await import("@/lib/scoring/plan-month");
+    const emp = { id: "S1", name: "S", role: "Site Supervisor", role_group: "supervisor" as const };
+    const month = (key: string, filed: number, warningsUsed: number) => {
+      const ds = Array.from({ length: 20 }, (_, i) => `${key}-${String(i + 1).padStart(2, "0")}`);
+      const plan = planMonthScores({
+        monthKey: key,
+        employees: [emp],
+        attendance: ds.map((d) => ({ employeeId: "S1", workDate: d, status: "Present", inAt: null, workMin: 510 })),
+        ratings: [],
+        params: [],
+        audit: new Map([["S1", audit({ dprDays: ds.slice(0, filed).map((d) => dpr(d, "Good")) })]]),
+        rules: DEFAULT_DUTY_RULES,
+        warningsUsed: new Map([["S1", warningsUsed]]),
+      });
+      return plan.rows[0]!.details["facts"] as { warningUsed: boolean; warningsLeft: number; adjustedAttendance: number; rawAttendance: number };
+    };
+    const sep = month("2026-09", 10, 0);
+    const oct = month("2026-10", 10, 1); // September already used one
+    const nov = month("2026-11", 10, 2); // both used
+    const dec = month("2026-12", 20, 2); // all updates filed: no penalty, no warning
+    expect([sep.warningUsed, sep.warningsLeft]).toEqual([true, 1]);
+    expect([oct.warningUsed, oct.warningsLeft]).toEqual([true, 0]);
+    expect(nov.warningUsed).toBe(false);
+    expect(nov.adjustedAttendance).toBeLessThan(nov.rawAttendance);
+    expect(dec).toMatchObject({ warningUsed: false });
+    // recomputing September sees only the OTHER months' warnings (October used one): it still gets one
+    expect(month("2026-09", 10, 1).warningUsed).toBe(true);
+    // ...but if both other months already used theirs, September's miss would now be penalised
+    expect(month("2026-09", 10, 2).warningUsed).toBe(false);
+  });
+});
+
+describe("chat coordination for designers", () => {
+  it("becomes the Coordination score (overall / 5 x 100) and replaces the task-based one", async () => {
+    const { applyChatCoordination } = await import("@/lib/scoring/chat-coordination");
+    const people = new Map<string, AuditPerson>([["D1", audit({ coordinationPct: 100 })]]);
+    const row = (id: string, overall: number) => ({ employee_id: id, overall, evidence: "Low", comment: "Gap: no ETA.", period: "September 2026" });
+    applyChatCoordination(people, [row("D1", 3.7), row("D2", 3.5), row("SUP", 4)], new Set(["D1", "D2"]));
+    expect(people.get("D1")!.coordinationPct).toBe(74); // replaced the 100 from Rdash tasks
+    expect(people.get("D2")!.coordinationPct).toBe(70); // a designer the audit had nothing for
+    expect(people.get("D2")!.coordinationBasis).toContain("3.5/5");
+    expect(people.has("SUP")).toBe(false); // supervisors are untouched
+
+    const rt: RatingIn[] = [{ name: "A", weight: 1, rating: 4 }];
+    const r = computeScore({ role: "designer", workingDays: 26, attendance: dates(26).map((d) => day(d, { workMin: 510 })), audit: people.get("D2")!, ratings: rt, rules: DEFAULT_DUTY_RULES });
+    // attendance 100 x25% + coordination 70 x40% + feedback 80 x35% = 25 + 28 + 28
+    expect(r.final).toBe(81);
+    expect(r.components.map((c) => c.key)).toEqual(["attendance", "coordination", "feedback"]);
   });
 });

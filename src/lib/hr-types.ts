@@ -75,8 +75,8 @@ export interface Employee {
   criteria: CriterionRating[];
   note: string;
   presentDays: number;
-  /** Days counted as present that were only a half day. */
-  halfDays: number;
+  /** Hours worked on the days attended. */
+  totalHours: number;
   absentDays: number;
   leaveDays: number;
   /** False when no attendance report has been uploaded for this month yet. */

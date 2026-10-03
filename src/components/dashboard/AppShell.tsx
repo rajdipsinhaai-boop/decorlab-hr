@@ -5,6 +5,7 @@ import {
   CalendarClock,
   LineChart as LineChartIcon,
   ShieldCheck,
+  MessageCircle,
   LogOut,
   RefreshCw,
   Menu,
@@ -36,6 +37,7 @@ export function navForRole(role: ViewerRole): NavItem[] {
       { id: "team", label: "Team", icon: <Users className="h-4 w-4" /> },
       { id: "attendance", label: "Attendance", icon: <CalendarClock className="h-4 w-4" /> },
       { id: "trends", label: "Trends", icon: <LineChartIcon className="h-4 w-4" /> },
+      { id: "whatsapp", label: "WhatsApp", icon: <MessageCircle className="h-4 w-4" /> },
       { id: "access", label: "Access & ratings", icon: <ShieldCheck className="h-4 w-4" /> },
     ];
   }

@@ -275,6 +275,14 @@ export const finalizeMonth = createServerFn({ method: "POST" })
     const { runWorker } = await import("./jobs/worker.server");
     const job = await enqueue("report.generate", { monthKey: key }, { createdBy: email });
     await runWorker({ jobId: job.id, budgetMs: 40_000 });
+    // Then send each person their card on WhatsApp. A problem here never undoes the finalize:
+    // the job retries on its own and skips anyone already sent.
+    try {
+      const wa = await enqueue("report.whatsapp", { monthKey: key }, { createdBy: email });
+      await runWorker({ jobId: wa.id, budgetMs: 40_000 });
+    } catch (error) {
+      console.error("WhatsApp send could not start:", error);
+    }
     return { pending: [], jobId: job.id };
   });
 
@@ -776,4 +784,87 @@ export const getIngestsThisMonth = createServerFn({ method: "GET" })
       .limit(20);
     if (error) throw new Error(error.message);
     return (data ?? []) as IngestRow[];
+  });
+
+export interface WhatsAppRow {
+  employeeId: string;
+  name: string;
+  role: string;
+  phone: string | null;
+  status: "sent" | "failed" | "pending";
+  error: string | null;
+  sentAt: string | null;
+}
+export interface WhatsAppStatus {
+  month: string;
+  finalized: boolean;
+  configured: boolean;
+  sendingEnabled: boolean;
+  testMode: boolean;
+  template: string;
+  rows: WhatsAppRow[];
+}
+
+/** Who has been sent their report card on WhatsApp for a month, and who has not (admins only). */
+export const getWhatsAppStatus = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { month: string }) => ({ month: validMonth(input?.month) }))
+  .handler(async ({ data, context }): Promise<WhatsAppStatus> => {
+    await assertAdmin(context as never);
+    const { monthKeyOf } = await import("./attendance/normalize");
+    const { isFinalized } = await import("./scoring/compute.server");
+    const { configFromEnv } = await import("./whatsapp/send");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const db = supabaseAdmin as any;
+    const key = monthKeyOf(data.month)!;
+    const [emp, sent] = await Promise.all([
+      db.from("employees").select("id, name, role, phone, status").order("id"),
+      db.from("whatsapp_deliveries").select("employee_id, status, error, sent_at").eq("month_key", key),
+    ]);
+    if (emp.error) throw new Error(emp.error.message);
+    if (sent.error) throw new Error(sent.error.message);
+    const byId = new Map<string, any>((sent.data ?? []).map((r: any) => [r.employee_id, r]));
+    const cfg = configFromEnv();
+    return {
+      month: data.month,
+      finalized: Boolean(await isFinalized(key)),
+      configured: cfg !== null,
+      sendingEnabled: Boolean(cfg?.enabled),
+      testMode: Boolean(cfg?.testTo),
+      template: cfg?.template ?? "monthly_report_card",
+      rows: (emp.data ?? [])
+        .filter((e: any) => String(e.status).toLowerCase() !== "inactive")
+        .map((e: any): WhatsAppRow => {
+          const d = byId.get(e.id);
+          return {
+            employeeId: e.id,
+            name: e.name,
+            role: e.role,
+            phone: e.phone ?? null,
+            status: d ? d.status : "pending",
+            error: d?.error ?? null,
+            sentAt: d?.sent_at ?? null,
+          };
+        }),
+    };
+  });
+
+/** Send (or retry) the WhatsApp report cards for a finalized month. Anyone already sent is skipped. */
+export const sendWhatsAppReports = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { month: string }) => ({ month: validMonth(input?.month) }))
+  .handler(async ({ data, context }): Promise<{ status: string; error: string | null }> => {
+    const email = await assertAdmin(context as never);
+    const { monthKeyOf } = await import("./attendance/normalize");
+    const { isFinalized } = await import("./scoring/compute.server");
+    const key = monthKeyOf(data.month)!;
+    if (!(await isFinalized(key))) {
+      throw new Error("Finalize the month first: the report cards are sent from the locked reports.");
+    }
+    const { enqueue, getJob } = await import("./jobs/queue.server");
+    const { runWorker } = await import("./jobs/worker.server");
+    const job = await enqueue("report.whatsapp", { monthKey: key }, { createdBy: email });
+    await runWorker({ jobId: job.id, budgetMs: 40_000 });
+    const done = await getJob(job.id);
+    return { status: done?.status ?? "queued", error: done?.error ?? null };
   });

@@ -32,7 +32,7 @@ async function handle(request: Request) {
       name: e.name,
       group: e.roleGroup,
       present_days: e.hasAttendance ? e.presentDays : null,
-      half_days: e.hasAttendance ? e.halfDays : null,
+      total_hours: e.hasAttendance ? e.totalHours : null,
       absent_days: e.hasAttendance ? e.absentDays : null,
       leave_days: e.hasAttendance ? e.leaveDays : null,
       avg_hours: e.hasAttendance ? e.avgHours : null,

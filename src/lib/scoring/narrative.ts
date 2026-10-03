@@ -1,5 +1,5 @@
 import { managerStats } from "./attendance-score";
-import { TARGET_HOURS } from "./constants";
+import { TARGET_HOURS, WARNINGS_PER_YEAR } from "./constants";
 import type { AuditPerson, RatingIn, RoleGroup, ScoreResult } from "./types";
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -55,15 +55,14 @@ export function buildNarrative(
     );
   }
 
-  // Attendance
-  if (f.presencePct >= 90) {
-    why.push(`Attendance is solid: present ${f.attendedDays} of ${f.workingDays} working days (${f.presencePct}%).`);
-  } else {
-    why.push(
-      `Present ${f.attendedDays} of ${f.workingDays} working days${f.creditDays < f.attendedDays ? `, worth ${f.creditDays} full-duty days once days cut short are counted` : ""} (${f.presencePct}%), which holds the attendance score back.`,
+  // Attendance: hours worked against working days x 8h30
+  const hoursLine = `${f.workedHours}h worked${f.overtimeHours ? ` (including ${f.overtimeHours}h overtime)` : ""} of ${f.expectedHours}h expected (${f.workingDays} working days x ${TARGET_HOURS}h), ${f.hoursPct}%`;
+  why.push(f.hoursPct >= 90 ? `Attendance is solid: ${hoursLine}.` : `Attendance: ${hoursLine}, which holds the attendance score back.`);
+  if (f.warningUsed) {
+    why.unshift(
+      `Warning used: a real update was visible on only ${f.visibleDays} of your ${f.attendedDays} days present, so one of your ${WARNINGS_PER_YEAR} yearly warnings has been used (${f.warningsLeft} left this year). Your attendance score is not reduced for it. Once the warnings are used up, days without an update will reduce attendance.`,
     );
-  }
-  if (f.visibilityFactor !== null && f.visibilityFactor < 1) {
+  } else if (f.visibilityFactor !== null && f.visibilityFactor < 1) {
     why.push(
       `You were present on ${f.attendedDays} days but a real update was visible on only ${f.visibleDays} of them, so your attendance credit drops from ${f.rawAttendance}% to ${f.adjustedAttendance}%. A day with no visible update counts as work nobody can see.`,
     );
@@ -72,8 +71,7 @@ export function buildNarrative(
   if (f.shortDays >= 3) {
     why.push(
       `You completed the full ${TARGET_HOURS}h duty on ${f.attendedDays - f.shortDays} of ${f.attendedDays} days present; ` +
-        `${f.shortDays} days ended short by about ${f.avgShortMin} minutes on average` +
-        (f.halfDays ? ` (${f.halfDays} of them logged as half days).` : ".")
+        `${f.shortDays} days ended short by about ${f.avgShortMin} minutes on average.`
     );
   }
 
@@ -108,7 +106,7 @@ export function buildNarrative(
     improve.push(
       "File a DPR every working day with real content -- what was done, where, blockers and tomorrow's plan. A blank template scores as Poor and does not count as a visible update.",
     );
-  } else if (f.visibilityFactor !== null && f.visibilityFactor < 1) {
+  } else if (f.visibilityFactor !== null && f.visibilityFactor < 1 && !f.warningUsed) {
     improve.push(
       "Make sure every day you are at work leaves a visible update in the system; each day without one reduces your attendance credit.",
     );
@@ -122,16 +120,13 @@ export function buildNarrative(
     improve.push(
       `Complete the full ${TARGET_HOURS}h duty every day you attend. Arriving late is fine if you stay on to make up the hours: ` +
         `work out your leaving time from when you punch in (for example, in at 11:30 means out at 20:00). ` +
-        `${f.shortDays} days this month ended short, by about ${f.avgShortMin} minutes on average, and those days count as only part of a day in your attendance score.`,
+        `${f.shortDays} days this month ended short, by about ${f.avgShortMin} minutes on average, and that shortfall is exactly what lowers your attendance score.`,
     );
   }
-  if (f.punctualitySample && f.onTimeDays / f.punctualitySample < 0.8) {
+  if (f.shortDays < 3 && f.hoursPct < 90) {
     improve.push(
-      `You were on time on only ${f.onTimeDays} of ${f.punctualitySample} days. Arrive within the 30-minute grace period, or make up the full ${TARGET_HOURS}h duty on the days you are late.`,
+      `Hours are the whole attendance score: ${f.workedHours}h worked against ${f.expectedHours}h expected. Come in on every working day and complete the full ${TARGET_HOURS}h; arriving late costs nothing if you stay on to make it up.`,
     );
-  }
-  if (f.shortDays < 3 && f.attendedDays && f.avgHours < TARGET_HOURS * 0.85) {
-    improve.push(`Average worked hours are ${f.avgHours}h against the ${TARGET_HOURS}h duty; closing that gap lifts the hours part of attendance.`);
   }
   const weak = [...mgr.zeros, ...mgr.low];
   if (weak.length) {

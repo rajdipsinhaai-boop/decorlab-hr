@@ -4,6 +4,7 @@ import { parseAudit } from "../audit-ingest";
 import { selectAll } from "../db-util.server";
 import { planMonthScores, type KraParam, type MonthEmployee, type RatingRow } from "./plan-month";
 import { DEFAULT_DUTY_RULES } from "./constants";
+import { applyChatCoordination } from "./chat-coordination";
 import type { AuditPerson, DutyRule, RoleGroup } from "./types";
 
 const db = () => supabaseAdmin as any;
@@ -98,6 +99,12 @@ export async function computeMonth(monthKey: string, opts: { force?: boolean } =
     ),
     db().from("holidays").select("holiday_date"),
   ]);
+  // Yearly warnings already used in the other months of this calendar year.
+  const year = Number(monthKey.slice(0, 4));
+  const usedRows = await db().from("employee_warnings").select("employee_id").eq("year", year).neq("month_key", monthKey);
+  if (usedRows.error) throw new Error(usedRows.error.message);
+  const warningsUsed = new Map<string, number>();
+  for (const w of usedRows.data ?? []) warningsUsed.set(w.employee_id, (warningsUsed.get(w.employee_id) ?? 0) + 1);
   for (const r of [emp, ali, params, rules, ratings, holidays]) if (r.error) throw new Error(r.error.message);
 
   const employees: MonthEmployee[] = (emp.data ?? []).filter(
@@ -105,6 +112,14 @@ export async function computeMonth(monthKey: string, opts: { force?: boolean } =
   );
   const aliasMap = new Map<string, string>((ali.data ?? []).map((a: any) => [normalizeName(a.alias_key), a.employee_id]));
   const audit = await loadAudit(monthKey, employees, aliasMap);
+  // Designers' Coordination comes from the WhatsApp-chat review where one exists for this month.
+  const chat = await db().from("chat_coordination").select("*").eq("month_key", monthKey);
+  if (chat.error) throw new Error(chat.error.message);
+  applyChatCoordination(
+    audit.people,
+    chat.data ?? [],
+    new Set(employees.filter((e) => e.role_group === "designer").map((e) => e.id)),
+  );
 
   const plan = planMonthScores({
     monthKey,
@@ -123,7 +138,19 @@ export async function computeMonth(monthKey: string, opts: { force?: boolean } =
     claudeScores: audit.claudeScores,
     rules: dutyRulesFrom(rules.data ?? []),
     holidays: (holidays.data ?? []).map((h: any) => String(h.holiday_date)),
+    warningsUsed,
   });
+
+  // Record which warnings this month used (and release one if a recompute no longer needs it).
+  const usedNow = plan.rows
+    .filter((r) => (r.details["facts"] as { warningUsed?: boolean }).warningUsed)
+    .map((r) => ({ employee_id: r.employee_id, month_key: monthKey, year, reason: "Fewer visible updates than days present" }));
+  const clear = await db().from("employee_warnings").delete().eq("month_key", monthKey);
+  if (clear.error) throw new Error(clear.error.message);
+  if (usedNow.length) {
+    const { error } = await db().from("employee_warnings").insert(usedNow);
+    if (error) throw new Error(error.message);
+  }
 
   if (plan.rows.length) {
     const { error } = await db()

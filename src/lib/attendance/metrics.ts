@@ -16,7 +16,8 @@ export interface DayRecord {
 
 export interface MonthMetrics {
   presentDays: number;
-  halfDays: number;
+  /** Hours worked on the days attended. */
+  totalHours: number;
   absentDays: number;
   leaveDays: number;
   avgHours: number;
@@ -49,7 +50,7 @@ export function summarizeMonth(days: DayRecord[], startMin: number = SCHEDULED_S
     .map((m) => m - startMin);
   return {
     presentDays: present.length,
-    halfDays: days.filter((d) => d.status === "Half Day").length,
+    totalHours: round1(present.reduce((a, d) => a + (d.workMin ?? 0), 0) / 60),
     absentDays: days.filter((d) => d.status === "Absent").length,
     leaveDays: days.filter((d) => d.status === "Leave").length,
     avgHours: hours.length ? round1(hours.reduce((a, b) => a + b, 0) / hours.length) : 0,

@@ -241,7 +241,7 @@ export function assembleDashboard(input: DashboardInput): DashboardData {
       criteria: s?.criteria?.length ? s.criteria : (ratingsByEmployee.get(e.id) ?? []),
       note: s?.note ?? "",
       presentDays: metrics.presentDays,
-      halfDays: metrics.halfDays,
+      totalHours: metrics.totalHours,
       absentDays: metrics.absentDays,
       leaveDays: metrics.leaveDays,
       hasAttendance: records.length > 0,

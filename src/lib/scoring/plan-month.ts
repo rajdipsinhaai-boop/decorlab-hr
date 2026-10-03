@@ -34,6 +34,8 @@ export interface MonthData {
   rules: Record<RoleGroup, DutyRule>;
   /** Official holiday dates (YYYY-MM-DD) from the holiday calendar. */
   holidays?: string[];
+  /** Yearly warnings each person used in OTHER months of this year. */
+  warningsUsed?: Map<string, number>;
   now?: Date;
 }
 
@@ -91,13 +93,18 @@ export function planMonthScores(data: MonthData): {
 
   for (const e of data.employees) {
     const attendance = data.attendance.filter((a) => a.employeeId === e.id && !off.has(a.workDate));
+    // Leave taken is not held against anyone: those days leave this person's working days.
+    const leaveDays = new Set(
+      attendance.filter((a) => a.status === "Leave" && new Date(`${a.workDate}T00:00:00Z`).getUTCDay() !== 0).map((a) => a.workDate),
+    ).size;
+    const personalWorkingDays = Math.max(0, workingDays - leaveDays);
     const ratings = ratingsFor(e, data.params, data.ratings);
     const audit = data.audit.get(e.id) ?? null;
     const hasRating = ratings.some((r) => r.rating !== null);
     // Someone with no attendance, no rating and no audit entry has nothing to show this month.
     if (!attendance.length && !hasRating && !audit) continue;
 
-    const result = computeScore({ role: e.role_group, workingDays, attendance, audit, ratings, rules: data.rules });
+    const result = computeScore({ role: e.role_group, workingDays: personalWorkingDays, leaveDays, warningsUsedBefore: data.warningsUsed?.get(e.id) ?? 0, attendance, audit, ratings, rules: data.rules });
     const card = buildScoreCard({
       name: e.name,
       role: e.role,

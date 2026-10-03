@@ -269,7 +269,6 @@ function pending(c: Ctx) {
 
 const STATUS_COLOR: Record<string, RGB> = {
   Present: GREEN,
-  "Half Day": AMBER,
   Incomplete: AMBER,
   Absent: RED,
   Leave: rgb(0.5, 0.6, 0.8),
@@ -298,7 +297,7 @@ function evidence(c: Ctx, days: AttendanceDay[], dpr: DprActivityEntry[]) {
       c.page.drawText(d.hours ? `${d.hours.toFixed(1)}h` : "-", { x: x + cell / 2 - 6, y: H - ty - 22, size: 5.5, font: c.font, color: rgb(1, 1, 1) });
     });
     c.y += Math.ceil(days.length / perRow) * (cell + 4) + 6;
-    const legend = Object.entries({ Present: "Present", "Half Day": "Half day / incomplete", Absent: "Absent", Leave: "Leave", "Week Off": "Week off / holiday" });
+    const legend = Object.entries({ Present: "Present (hours shown)", Incomplete: "Missing punch", Absent: "Absent", Leave: "Leave", "Week Off": "Week off / holiday" });
     let lx = M;
     for (const [k, label] of legend) {
       c.page.drawRectangle({ x: lx, y: yy(c) - 7, width: 7, height: 7, color: STATUS_COLOR[k]! });

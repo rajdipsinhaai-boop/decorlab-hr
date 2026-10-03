@@ -274,12 +274,14 @@ Admins can ask questions in the chat box. The server loads the dashboard data, s
 
 **Inputs:** (1) attendance from the biometric upload, (2) the monthly Claude audit (DPR days graded, designer coordination, activity days), (3) director ratings entered in the dashboard. Scores recompute automatically whenever any of them changes and show **Pending** (naming what is missing) until all are in. An admin presses **Finalize month** to freeze the scores and store the report cards; **Reopen** undoes it.
 
-**Raw attendance** = 70% presence + 20% hours + 10% punctuality.
-- Presence: days attended (present, half day or missing punch) ÷ working days (calendar days minus Sundays).
-- Hours: average worked hours on attended days ÷ 9, capped at 100%.
-- Punctuality: share of attended days arriving by the shift's start time plus grace (`shift_rules` table, seeded 10:00 + 15 minutes for every shift).
+**Raw attendance** = hours worked ÷ (working days × 8.5), capped at 100%.
+- Working days = calendar days minus Sundays minus official holidays (`holidays` table). A day the biometric machine calls a holiday but is not on that table counts as a working day if the person punched in.
+- Hours are counted on days attended. A late arrival costs nothing by itself, only the hours count, and overtime on one day can cover a short day in the same month. A day with no hours recorded adds none.
+- Statuses: a "half day" that worked 8h30 or more is stored as Present.
 
 **Work-visibility rule.** A day counts as visible only if the person was present *and* left a real update that day. Adjusted attendance = raw × (visible days ÷ present days). Supervisors: a non-blank DPR filed that day (a DPR filed on a day off offsets nothing; blank templates do not count). Designers and EA: Rdash activity days if the audit supplies them, never below 50%; no data means no penalty.
+
+**Yearly warnings.** Each person has 2 warnings per calendar year (`employee_warnings` table). A month with fewer visible updates than days present uses one warning instead of the attendance reduction, and the report card says so. Once both are used, the reduction above applies. Recalculating a month never uses a warning twice.
 
 **Section scores**
 - DPR Combined = coverage × 40% + quality × 60% (coverage = distinct filing days ÷ working days; quality = average of Excellent 100 / Good 75 / Partial 50 / Poor 25).

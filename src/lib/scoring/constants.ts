@@ -12,11 +12,11 @@ export const WEIGHTS = {
   ea: { attendance: 60, feedback: 40 },
 } as const;
 
-/** Raw attendance score = 70% presence + 20% hours + 10% punctuality. */
-export const ATTENDANCE_BLEND = { presence: 0.7, hours: 0.2, punctuality: 0.1 } as const;
-
 /** DPR Combined = coverage x 40% + quality x 60%. */
 export const DPR_BLEND = { coverage: 0.4, quality: 0.6 } as const;
+
+/** A month with fewer visible updates than days present costs a warning instead of attendance points, this many times a year. */
+export const WARNINGS_PER_YEAR = 2;
 
 export const GRADE_SCORE: Record<string, number> = { excellent: 100, good: 75, partial: 50, poor: 25 };
 
@@ -25,7 +25,7 @@ export const DESIGNER_VISIBILITY_FLOOR = 0.5;
 
 /**
  * Duty rules agreed for everyone: a 30-minute grace period, and a full day is 8 hours 30 minutes.
- * Arriving late is fine if the 8h30 is completed. Designers and the EA start at 10:00, supervisors at 11:00.
+ * Attendance is hours worked against working days x 8h30, so arriving late is fine if the hours are made up. Designers and the EA start at 10:00, supervisors at 11:00.
  * The values in the duty_rules table override these.
  */
 export const DEFAULT_DUTY_RULES: Record<RoleGroup, DutyRule> = {

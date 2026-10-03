@@ -6,6 +6,7 @@ type Handler = (job: Job) => Promise<Record<string, unknown>>;
 const HANDLERS: Record<string, Handler> = {
   "attendance.import": async (job) => (await import("../attendance/import.server")).runAttendanceImport(job),
   "report.generate": async (job) => (await import("../report/generate.server")).runReportGeneration(job),
+  "report.whatsapp": async (job) => (await import("../whatsapp/report-whatsapp.server")).runReportWhatsApp(job),
 };
 
 export interface WorkerReport {
