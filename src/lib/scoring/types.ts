@@ -60,12 +60,17 @@ export interface Component {
 export interface Facts {
   workingDays: number;
   attendedDays: number;
+  creditDays: number;
   avgHours: number;
   presencePct: number;
   hoursPct: number;
   punctualityPct: number;
   onTimeDays: number;
   punctualitySample: number;
+  shortDays: number;
+  avgShortMin: number;
+  halfDays: number;
+  requiredMin: number;
   rawAttendance: number;
   visibilityFactor: number | null;
   visibleDays: number;

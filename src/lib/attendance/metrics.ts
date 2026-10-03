@@ -59,11 +59,38 @@ export function summarizeMonth(days: DayRecord[], startMin: number = SCHEDULED_S
   };
 }
 
-/** Calendar days in a month minus Sundays: the denominator the KRA audit uses. */
-export function workingDaysInMonth(monthKey: string): number {
+/**
+ * Calendar days in a month minus Sundays and official holidays (YYYY-MM-DD): the denominator the
+ * KRA audit uses. A holiday on a Sunday is not removed twice.
+ */
+export function workingDaysInMonth(monthKey: string, holidays: Iterable<string> = []): number {
   const [y, m] = monthKey.split("-").map(Number) as [number, number];
+  const off = new Set(holidays);
   const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
   let n = 0;
-  for (let d = 1; d <= last; d++) if (new Date(Date.UTC(y, m - 1, d)).getUTCDay() !== 0) n++;
+  for (let d = 1; d <= last; d++) {
+    const iso = `${monthKey}-${String(d).padStart(2, "0")}`;
+    if (new Date(Date.UTC(y, m - 1, d)).getUTCDay() !== 0 && !off.has(iso)) n++;
+  }
   return n;
+}
+
+/**
+ * Dates nobody is expected to work: the holiday calendar plus any day the biometric report itself
+ * marks as a public holiday for most of the staff.
+ */
+export function holidayDates(
+  calendar: Iterable<string>,
+  records: { workDate: string; status: string }[],
+): Set<string> {
+  const out = new Set(calendar);
+  const tally = new Map<string, { holiday: number; all: number }>();
+  for (const r of records) {
+    const t = tally.get(r.workDate) ?? { holiday: 0, all: 0 };
+    t.all++;
+    if (r.status === "Holiday") t.holiday++;
+    tally.set(r.workDate, t);
+  }
+  for (const [date, t] of tally) if (t.holiday * 2 >= t.all) out.add(date);
+  return out;
 }

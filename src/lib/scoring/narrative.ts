@@ -59,11 +59,21 @@ export function buildNarrative(
   if (f.presencePct >= 90) {
     why.push(`Attendance is solid: present ${f.attendedDays} of ${f.workingDays} working days (${f.presencePct}%).`);
   } else {
-    why.push(`Present ${f.attendedDays} of ${f.workingDays} working days (${f.presencePct}%), which holds the attendance score back.`);
+    why.push(
+      `Present ${f.attendedDays} of ${f.workingDays} working days${f.creditDays < f.attendedDays ? `, worth ${f.creditDays} full-duty days once days cut short are counted` : ""} (${f.presencePct}%), which holds the attendance score back.`,
+    );
   }
   if (f.visibilityFactor !== null && f.visibilityFactor < 1) {
     why.push(
       `You were present on ${f.attendedDays} days but a real update was visible on only ${f.visibleDays} of them, so your attendance credit drops from ${f.rawAttendance}% to ${f.adjustedAttendance}%. A day with no visible update counts as work nobody can see.`,
+    );
+  }
+
+  if (f.shortDays >= 3) {
+    why.push(
+      `You completed the full ${TARGET_HOURS}h duty on ${f.attendedDays - f.shortDays} of ${f.attendedDays} days present; ` +
+        `${f.shortDays} days ended short by about ${f.avgShortMin} minutes on average` +
+        (f.halfDays ? ` (${f.halfDays} of them logged as half days).` : ".")
     );
   }
 
@@ -108,12 +118,19 @@ export function buildNarrative(
       "Respond to and close revision/markup comments promptly, even if the fix takes longer -- acknowledging and starting beats leaving it untouched.",
     );
   }
+  if (f.shortDays >= 3) {
+    improve.push(
+      `Complete the full ${TARGET_HOURS}h duty every day you attend. Arriving late is fine if you stay on to make up the hours: ` +
+        `work out your leaving time from when you punch in (for example, in at 11:30 means out at 20:00). ` +
+        `${f.shortDays} days this month ended short, by about ${f.avgShortMin} minutes on average, and those days count as only part of a day in your attendance score.`,
+    );
+  }
   if (f.punctualitySample && f.onTimeDays / f.punctualitySample < 0.8) {
     improve.push(
       `You were on time on only ${f.onTimeDays} of ${f.punctualitySample} days. Arrive within the 30-minute grace period, or make up the full ${TARGET_HOURS}h duty on the days you are late.`,
     );
   }
-  if (f.attendedDays && f.avgHours < TARGET_HOURS * 0.85) {
+  if (f.shortDays < 3 && f.attendedDays && f.avgHours < TARGET_HOURS * 0.85) {
     improve.push(`Average worked hours are ${f.avgHours}h against the ${TARGET_HOURS}h duty; closing that gap lifts the hours part of attendance.`);
   }
   const weak = [...mgr.zeros, ...mgr.low];

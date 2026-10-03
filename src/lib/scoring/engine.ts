@@ -58,7 +58,9 @@ export function computeScore(input: ScoreInput): ScoreResult {
   }
 
   const attNote =
-    `Present ${blend.attendedDays} of ${workingDays} working days (${pct(blend.presence * 100)}), ` +
+    `Present ${blend.attendedDays} of ${workingDays} working days` +
+    (blend.creditDays < blend.attendedDays ? `, worth ${blend.creditDays} full-duty days because some days ended short` : "") +
+    ` (${pct(blend.presence * 100)}), ` +
     `averaging ${blend.avgHours}h a day against ${TARGET_HOURS}h` +
     (blend.punctualitySample
       ? `, on time on ${blend.onTimeDays} of ${blend.punctualitySample} days (in by ${hhmm(rule.startMin + rule.graceMin)}, or a full ${TARGET_HOURS}h day)`
@@ -127,12 +129,17 @@ export function computeScore(input: ScoreInput): ScoreResult {
   const facts: Facts = {
     workingDays,
     attendedDays: blend.attendedDays,
+    creditDays: blend.creditDays,
     avgHours: blend.avgHours,
     presencePct: round1(blend.presence * 100),
     hoursPct: round1(blend.hours * 100),
     punctualityPct: round1(blend.punctuality * 100),
     onTimeDays: blend.onTimeDays,
     punctualitySample: blend.punctualitySample,
+    shortDays: blend.shortDays,
+    avgShortMin: blend.avgShortMin,
+    halfDays: blend.halfDays,
+    requiredMin: rule.requiredMin,
     rawAttendance: blend.raw,
     visibilityFactor: vis.factor,
     visibleDays: vis.visibleDays,

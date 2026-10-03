@@ -16,6 +16,8 @@ export function isoDate(v: string): string {
 
 export interface AttendanceBlend {
   attendedDays: number;
+  /** Attended days counted in full-duty days (a day cut short counts as part of a day). */
+  creditDays: number;
   attendedDates: string[];
   avgHours: number;
   presence: number; // 0-1
@@ -23,12 +25,18 @@ export interface AttendanceBlend {
   punctuality: number; // 0-1
   onTimeDays: number;
   punctualitySample: number;
+  /** Attended days with hours recorded that ended short of the full duty, and the average shortfall. */
+  shortDays: number;
+  avgShortMin: number;
+  halfDays: number;
   raw: number; // 0-100, one decimal
 }
 
 /**
  * Raw attendance = 70% presence + 20% hours + 10% punctuality.
- *  - presence: days attended (present, half day or missing punch) over working days
+ *  - presence: full-duty days over working days. A day attended earns credit in proportion to the
+ *    hours worked against the 8h30 duty (capped at 1), so a day cut short is only part of a day.
+ *    A day with no hours recorded (missing punch) gets full credit: nothing to judge it on.
  *  - hours: average worked hours on attended days against the 8h30 duty, capped at 100%
  *  - punctuality: share of attended days that count as on time: arrived within the grace period of the
  *    start time, OR completed the full 8h30 duty (arriving late is fine if the hours are made up)
@@ -40,12 +48,18 @@ export function attendanceBlend(
   rule: DutyRule,
 ): AttendanceBlend {
   const here = days.filter((d) => attended(d.status));
-  const presence = workingDays > 0 ? Math.min(1, here.length / workingDays) : 0;
+  const credit = (d: AttDay) => ((d.workMin ?? 0) > 0 ? Math.min(1, (d.workMin ?? 0) / rule.requiredMin) : 1);
+  const creditDays = here.reduce((a, d) => a + credit(d), 0);
+  const presence = workingDays > 0 ? Math.min(1, creditDays / workingDays) : 0;
 
   const hoursList = here.map((d) => (d.workMin ?? 0) / 60).filter((h) => h > 0);
   const avgHours = hoursList.length ? hoursList.reduce((a, b) => a + b, 0) / hoursList.length : 0;
   const hours = hoursList.length ? Math.min(1, avgHours / TARGET_HOURS) : 1;
 
+  const short = here.filter((d) => (d.workMin ?? 0) > 0 && (d.workMin ?? 0) < rule.requiredMin);
+  const avgShortMin = short.length
+    ? Math.round(short.reduce((a, d) => a + rule.requiredMin - (d.workMin ?? 0), 0) / short.length)
+    : 0;
   let onTimeDays = 0;
   let sample = 0;
   for (const d of here) {
@@ -73,6 +87,7 @@ export function attendanceBlend(
     : 0;
   return {
     attendedDays: here.length,
+    creditDays: round1(creditDays),
     attendedDates: [...new Set(here.map((d) => d.workDate))].sort(),
     avgHours: round1(avgHours),
     presence,
@@ -80,6 +95,9 @@ export function attendanceBlend(
     punctuality,
     onTimeDays,
     punctualitySample: sample,
+    shortDays: short.length,
+    avgShortMin,
+    halfDays: days.filter((d) => d.status === "Half Day").length,
     raw: round1(raw),
   };
 }

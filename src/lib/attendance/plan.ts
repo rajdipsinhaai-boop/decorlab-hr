@@ -1,6 +1,6 @@
 import { resolveIdentity, type MatchContext } from "./match";
 import { summarizeMonth, type MonthMetrics } from "./metrics";
-import { deriveStatus } from "./normalize";
+import { dayOutcome } from "./normalize";
 import type { ParsedDay, ParsedReport } from "./types";
 
 /** One row of public.attendance_records, in the shape import_attendance_records() expects. */
@@ -59,7 +59,7 @@ export interface ImportPlan {
   stats: ImportStats;
 }
 
-export function toDbRow(d: ParsedDay, employeeId: string | null): DbRecordRow {
+export function toDbRow(d: ParsedDay, employeeId: string | null, holidays: ReadonlySet<string> = new Set()): DbRecordRow {
   return {
     month_key: d.workDate.slice(0, 7),
     work_date: d.workDate,
@@ -73,7 +73,7 @@ export function toDbRow(d: ParsedDay, employeeId: string | null): DbRecordRow {
     out2_at: d.out2At,
     first_half: d.firstHalf,
     second_half: d.secondHalf,
-    status: deriveStatus(d.firstHalf, d.secondHalf),
+    status: dayOutcome(d.firstHalf, d.secondHalf, d.workMin, d.workDate, holidays, Boolean(d.inAt || d.outAt)),
     late_in_min: d.lateInMin,
     early_out_min: d.earlyOutMin,
     work_min: d.workMin,
@@ -83,7 +83,7 @@ export function toDbRow(d: ParsedDay, employeeId: string | null): DbRecordRow {
 }
 
 /** Decides, without touching the database, what an upload will write and who could not be mapped. */
-export function planImport(report: ParsedReport, ctx: MatchContext): ImportPlan {
+export function planImport(report: ParsedReport, ctx: MatchContext, holidays: ReadonlySet<string> = new Set()): ImportPlan {
   const names = new Map(ctx.employees.map((e) => [e.id, e.name]));
   const rows: DbRecordRow[] = [];
   const learn: ImportPlan["learn"] = [];
@@ -102,7 +102,7 @@ export function planImport(report: ParsedReport, ctx: MatchContext): ImportPlan 
       continue;
     }
     const employeeId = res.kind === "matched" ? res.employeeId : null;
-    const dbRows = days.map((d) => toDbRow(d, employeeId));
+    const dbRows = days.map((d) => toDbRow(d, employeeId, holidays));
     rows.push(...dbRows);
 
     if (res.kind === "matched") {
