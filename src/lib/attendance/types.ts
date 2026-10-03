@@ -44,7 +44,6 @@ export interface ParsedReport {
 /** Normalised daily outcome stored in the database. */
 export type DayStatus =
   | "Present"
-  | "Half Day"
   | "Incomplete"
   | "Absent"
   | "Week Off"
@@ -52,8 +51,8 @@ export type DayStatus =
   | "Leave"
   | "Unknown";
 
-/** Days that count toward "present days" (a half day or a missing punch is still a day worked). */
-export const ATTENDED_STATUSES: readonly DayStatus[] = ["Present", "Half Day", "Incomplete"];
+/** Days that count toward "present days" (a missing punch is still a day worked). */
+export const ATTENDED_STATUSES: readonly DayStatus[] = ["Present", "Incomplete"];
 
 export class AttendanceParseError extends Error {
   constructor(message: string) {

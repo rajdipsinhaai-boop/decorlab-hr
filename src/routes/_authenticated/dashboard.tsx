@@ -19,6 +19,7 @@ import { UploadAttendanceCard } from "@/components/dashboard/UploadAttendanceCar
 import { UploadWhatsAppCard } from "@/components/dashboard/UploadWhatsAppCard";
 import { AskTeamChat } from "@/components/dashboard/AskTeamChat";
 import { AdminAccessPanel } from "@/components/dashboard/AdminAccessPanel";
+import { WhatsAppStatus } from "@/components/dashboard/WhatsAppStatus";
 import { ClaudeIngestCard } from "@/components/dashboard/ClaudeIngestCard";
 import { DirectorRatingsPanel } from "@/components/dashboard/DirectorRatingsPanel";
 import { AppShell, navForRole } from "@/components/dashboard/AppShell";
@@ -453,6 +454,10 @@ function LeadershipView({ data }: { data: DashboardData }) {
 
         <div ref={setRef("trends")} id="trends" className="scroll-mt-24">
           <TrendSection data={data} />
+        </div>
+
+        <div ref={setRef("whatsapp")} id="whatsapp" className="scroll-mt-24">
+          <WhatsAppStatus month={data.month} />
         </div>
 
         <div ref={setRef("access")} id="access" className="scroll-mt-24 space-y-6">

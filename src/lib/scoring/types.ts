@@ -43,6 +43,10 @@ export interface RatingIn {
 export interface ScoreInput {
   role: RoleGroup;
   workingDays: number;
+  /** Leave days already removed from workingDays (for the explanation only). */
+  leaveDays?: number;
+  /** Warnings this person has already used earlier this year (of WARNINGS_PER_YEAR). */
+  warningsUsedBefore?: number;
   attendance: AttDay[];
   audit: AuditPerson | null;
   ratings: RatingIn[];
@@ -60,16 +64,20 @@ export interface Component {
 export interface Facts {
   workingDays: number;
   attendedDays: number;
-  creditDays: number;
   avgHours: number;
-  presencePct: number;
+  workedHours: number;
+  expectedHours: number;
+  /** Worked hours as a share of expected hours, before any visibility adjustment. */
   hoursPct: number;
-  punctualityPct: number;
-  onTimeDays: number;
-  punctualitySample: number;
   shortDays: number;
   avgShortMin: number;
-  halfDays: number;
+  overtimeHours: number;
+  /** Leave days taken: already taken out of workingDays, so they are not held against anyone. */
+  leaveDays: number;
+  /** A yearly warning was used this month, so the missed updates did not reduce attendance. */
+  warningUsed: boolean;
+  /** Warnings still left this year after this month. */
+  warningsLeft: number;
   requiredMin: number;
   rawAttendance: number;
   visibilityFactor: number | null;

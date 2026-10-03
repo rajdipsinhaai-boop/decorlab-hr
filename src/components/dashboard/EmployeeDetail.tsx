@@ -69,7 +69,7 @@ export function EmployeeDetail({
                 {employee.hasAttendance ? (
                   <p className="text-xs text-muted-foreground">
                     {employee.presentDays} present
-                    {employee.halfDays ? ` (${employee.halfDays} half days)` : ""} · {employee.absentDays} absent
+                    {" "}· {employee.totalHours}h worked · {employee.absentDays} absent
                     {employee.leaveDays ? ` · ${employee.leaveDays} on leave` : ""} · avg {employee.avgHours}h/day ·
                     punctuality {employee.punctualityDeviation >= 0 ? "+" : ""}
                     {employee.punctualityDeviation} min

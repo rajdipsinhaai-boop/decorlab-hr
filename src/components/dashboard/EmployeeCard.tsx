@@ -48,7 +48,7 @@ export function EmployeeCard({ employee, onOpen }: { employee: Employee; onOpen:
       <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
         <span>
           {employee.hasAttendance
-            ? `${employee.presentDays} present${employee.halfDays ? ` (${employee.halfDays} half)` : ""} · ${employee.absentDays} absent`
+            ? `${employee.presentDays} present · ${employee.totalHours}h worked · ${employee.absentDays} absent`
             : "No attendance uploaded yet"}
         </span>
         <span className="inline-flex items-center gap-1 text-primary opacity-0 transition-opacity group-hover:opacity-100">

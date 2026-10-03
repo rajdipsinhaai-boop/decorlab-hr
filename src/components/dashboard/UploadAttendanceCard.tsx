@@ -182,7 +182,7 @@ function ImportSummary({
             <tr>
               <th className="py-1 pr-2 font-medium">Employee</th>
               <th className="px-2 font-medium">Present</th>
-              <th className="px-2 font-medium">Half</th>
+              <th className="px-2 font-medium">Hours</th>
               <th className="px-2 font-medium">Absent</th>
               <th className="px-2 font-medium">Leave</th>
               <th className="px-2 font-medium">Avg hrs</th>
@@ -195,7 +195,7 @@ function ImportSummary({
                   {p.employeeName} <span className="text-muted-foreground">({p.cosecId})</span>
                 </td>
                 <td className="px-2 tabular-nums">{p.summary?.presentDays}</td>
-                <td className="px-2 tabular-nums">{p.summary?.halfDays}</td>
+                <td className="px-2 tabular-nums">{p.summary?.totalHours}</td>
                 <td className="px-2 tabular-nums">{p.summary?.absentDays}</td>
                 <td className="px-2 tabular-nums">{p.summary?.leaveDays}</td>
                 <td className="px-2 tabular-nums">{p.summary ? fmt(p.summary.avgHours) : ""}</td>

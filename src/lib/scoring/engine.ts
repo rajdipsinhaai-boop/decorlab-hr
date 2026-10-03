@@ -1,5 +1,5 @@
-import { attendanceBlend, dprStats, managerStats, visibility } from "./attendance-score";
-import { hhmm, TARGET_HOURS, WEIGHTS, ragFor } from "./constants";
+import { attendanceHours, dprStats, managerStats, visibility } from "./attendance-score";
+import { TARGET_HOURS, WARNINGS_PER_YEAR, WEIGHTS, ragFor } from "./constants";
 import type { Component, Facts, Rag, RoleGroup, ScoreInput, ScoreResult } from "./types";
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -37,13 +37,19 @@ export function combine(
 export function computeScore(input: ScoreInput): ScoreResult {
   const { role, workingDays } = input;
   const rule = input.rules[role];
-  const blend = attendanceBlend(input.attendance, workingDays, rule);
+  const blend = attendanceHours(input.attendance, workingDays, rule);
   const vis = visibility(role, blend.attendedDates, input.audit);
   const dpr = input.audit && role === "supervisor" ? dprStats(input.audit, workingDays) : null;
   const mgr = managerStats(input.ratings);
   const coordination = role === "designer" ? (input.audit?.coordinationPct ?? null) : null;
 
-  const adjusted = round1(blend.raw * (vis.factor ?? 1));
+  // Fewer visible updates than days present: the first WARNINGS_PER_YEAR times a year this costs a
+  // warning and leaves attendance alone; after that the visibility penalty applies.
+  const missedUpdates = vis.factor !== null && vis.factor < 1;
+  const usedBefore = input.warningsUsedBefore ?? 0;
+  const warningUsed = missedUpdates && usedBefore < WARNINGS_PER_YEAR;
+  const warningsLeft = Math.max(0, WARNINGS_PER_YEAR - usedBefore - (warningUsed ? 1 : 0));
+  const adjusted = round1(blend.raw * (warningUsed ? 1 : (vis.factor ?? 1)));
 
   const missing: string[] = [];
   if (!input.attendance.length) missing.push("the attendance upload");
@@ -58,16 +64,12 @@ export function computeScore(input: ScoreInput): ScoreResult {
   }
 
   const attNote =
-    `Present ${blend.attendedDays} of ${workingDays} working days` +
-    (blend.creditDays < blend.attendedDays ? `, worth ${blend.creditDays} full-duty days because some days ended short` : "") +
-    ` (${pct(blend.presence * 100)}), ` +
-    `averaging ${blend.avgHours}h a day against ${TARGET_HOURS}h` +
-    (blend.punctualitySample
-      ? `, on time on ${blend.onTimeDays} of ${blend.punctualitySample} days (in by ${hhmm(rule.startMin + rule.graceMin)}, or a full ${TARGET_HOURS}h day)`
-      : "") +
-    ` -> raw ${blend.raw}%.` +
-    (vis.factor !== null && vis.factor < 1
-      ? ` A real update was visible on only ${vis.visibleDays} of ${vis.presentDays} days present -> adjusted down to ${adjusted}%.`
+    `Worked ${blend.workedHours}h${blend.overtimeHours ? ` (including ${blend.overtimeHours}h overtime)` : ""} of ${blend.expectedHours}h expected (${workingDays} working days x ${TARGET_HOURS}h${input.leaveDays ? `, after ${input.leaveDays} leave day${input.leaveDays > 1 ? "s" : ""} not held against you` : ""}) -> raw ${blend.raw}%. ` +
+    `Present ${blend.attendedDays} days, averaging ${blend.avgHours}h a day.` +
+    (warningUsed
+      ? ` A real update was visible on only ${vis.visibleDays} of ${vis.presentDays} days present: one of your ${WARNINGS_PER_YEAR} yearly warnings was used, so attendance is not reduced (${warningsLeft} warning${warningsLeft === 1 ? "" : "s"} left this year).`
+      : vis.factor !== null && vis.factor < 1
+      ? ` A real update was visible on only ${vis.visibleDays} of ${vis.presentDays} days present, and both yearly warnings are already used -> adjusted down to ${adjusted}%.`
       : vis.factor !== null
         ? ` A real update was visible on every day present.`
         : "");
@@ -129,16 +131,16 @@ export function computeScore(input: ScoreInput): ScoreResult {
   const facts: Facts = {
     workingDays,
     attendedDays: blend.attendedDays,
-    creditDays: blend.creditDays,
     avgHours: blend.avgHours,
-    presencePct: round1(blend.presence * 100),
-    hoursPct: round1(blend.hours * 100),
-    punctualityPct: round1(blend.punctuality * 100),
-    onTimeDays: blend.onTimeDays,
-    punctualitySample: blend.punctualitySample,
+    workedHours: blend.workedHours,
+    expectedHours: blend.expectedHours,
+    hoursPct: blend.raw,
     shortDays: blend.shortDays,
     avgShortMin: blend.avgShortMin,
-    halfDays: blend.halfDays,
+    overtimeHours: blend.overtimeHours,
+    leaveDays: input.leaveDays ?? 0,
+    warningUsed,
+    warningsLeft,
     requiredMin: rule.requiredMin,
     rawAttendance: blend.raw,
     visibilityFactor: vis.factor,

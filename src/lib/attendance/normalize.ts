@@ -95,7 +95,7 @@ export function deriveStatus(first: string, second: string): DayStatus {
   if (a === "PH" || b === "PH") return "Holiday";
   if (a === "PR" && b === "PR") return "Present";
   if (a === "IN" || b === "IN") return "Incomplete";
-  if (a === "PR" || b === "PR") return "Half Day";
+  if (a === "PR" || b === "PR") return "Present"; // there is no half day: the hours worked say how much
   if (LEAVE_CODES.has(a) && LEAVE_CODES.has(b)) return "Leave";
   if (a === "AB" && b === "AB") return "Absent";
   if ((a === "AB" || LEAVE_CODES.has(a)) && (b === "AB" || LEAVE_CODES.has(b))) return "Absent";
@@ -103,13 +103,10 @@ export function deriveStatus(first: string, second: string): DayStatus {
   return "Unknown";
 }
 
-/** Minutes of duty that make a full day (8h30). */
-export const FULL_DAY_MIN = 510;
-
 /**
- * The stored outcome for a day. The biometric system calls a late arrival "half day" even when the
- * person stayed on and worked a full day, so a half day with a full day's hours (overtime included)
- * is a Present day. Days on our holiday calendar are never anything else, whatever the punches say.
+ * The stored outcome for a day. The biometric system's "half day" is not a status here: someone who
+ * attended is Present, and the hours they worked (less, full or overtime) are what is graded.
+ * Days on our holiday calendar are never anything else, whatever the punches say.
  */
 export function dayOutcome(
   first: string,
@@ -123,8 +120,8 @@ export function dayOutcome(
   const status = deriveStatus(first, second);
   // Our holiday calendar is the authority. If the biometric calendar calls a day a holiday that is
   // not on ours and the person punched in and worked, it was a working day.
-  if (status === "Holiday" && punched) return (workMin ?? 0) >= FULL_DAY_MIN ? "Present" : workMin ? "Half Day" : "Incomplete";
-  return status === "Half Day" && (workMin ?? 0) >= FULL_DAY_MIN ? "Present" : status;
+  if (status === "Holiday" && punched) return workMin ? "Present" : "Incomplete";
+  return status;
 }
 
 export const KNOWN_HALF_CODES = new Set(["PR", "AB", "WO", "PH", "IN", ...LEAVE_CODES]);

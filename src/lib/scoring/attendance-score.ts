@@ -1,6 +1,5 @@
-import { arrivalMinutes } from "../attendance/metrics";
 import { ATTENDED_STATUSES } from "../attendance/types";
-import { ATTENDANCE_BLEND, DESIGNER_VISIBILITY_FLOOR, GRADE_SCORE, TARGET_HOURS } from "./constants";
+import { DESIGNER_VISIBILITY_FLOOR, GRADE_SCORE } from "./constants";
 import type { AttDay, AuditPerson, DutyRule, RoleGroup } from "./types";
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -14,90 +13,50 @@ export function isoDate(v: string): string {
   return m ? `${m[3]}-${m[2]!.padStart(2, "0")}-${m[1]!.padStart(2, "0")}` : "";
 }
 
-export interface AttendanceBlend {
+export interface AttendanceHours {
   attendedDays: number;
-  /** Attended days counted in full-duty days (a day cut short counts as part of a day). */
-  creditDays: number;
   attendedDates: string[];
+  workedHours: number;
+  /** Working days x the full duty (8h30). */
+  expectedHours: number;
+  /** Average hours on the attended days that have hours recorded. */
   avgHours: number;
-  presence: number; // 0-1
-  hours: number; // 0-1
-  punctuality: number; // 0-1
-  onTimeDays: number;
-  punctualitySample: number;
   /** Attended days with hours recorded that ended short of the full duty, and the average shortfall. */
   shortDays: number;
   avgShortMin: number;
-  halfDays: number;
+  /** Hours beyond the full duty on days that ran over (already part of workedHours). */
+  overtimeHours: number;
   raw: number; // 0-100, one decimal
 }
 
 /**
- * Raw attendance = 70% presence + 20% hours + 10% punctuality.
- *  - presence: full-duty days over working days. A day attended earns credit in proportion to the
- *    hours worked against the 8h30 duty (capped at 1), so a day cut short is only part of a day.
- *    A day with no hours recorded (missing punch) gets full credit: nothing to judge it on.
- *  - hours: average worked hours on attended days against the 8h30 duty, capped at 100%
- *  - punctuality: share of attended days that count as on time: arrived within the grace period of the
- *    start time, OR completed the full 8h30 duty (arriving late is fine if the hours are made up)
- * A part with no usable data (no hours recorded, no readable arrival) is neutral rather than a penalty.
+ * Raw attendance = hours worked / (working days x 8h30), capped at 100%.
+ * Holidays and Sundays are already out of the working days. Late arrival costs nothing by itself;
+ * only the hours count, so a late start made up in full scores the same as an on-time one, and
+ * overtime on one day can cover a short day in the same month. Only days attended count, and a day
+ * with no hours recorded (missing punch) adds none.
  */
-export function attendanceBlend(
-  days: AttDay[],
-  workingDays: number,
-  rule: DutyRule,
-): AttendanceBlend {
+export function attendanceHours(days: AttDay[], workingDays: number, rule: DutyRule): AttendanceHours {
   const here = days.filter((d) => attended(d.status));
-  const credit = (d: AttDay) => ((d.workMin ?? 0) > 0 ? Math.min(1, (d.workMin ?? 0) / rule.requiredMin) : 1);
-  const creditDays = here.reduce((a, d) => a + credit(d), 0);
-  const presence = workingDays > 0 ? Math.min(1, creditDays / workingDays) : 0;
+  const workedMin = here.reduce((a, d) => a + Math.max(0, d.workMin ?? 0), 0);
+  const expectedMin = workingDays * rule.requiredMin;
 
-  const hoursList = here.map((d) => (d.workMin ?? 0) / 60).filter((h) => h > 0);
-  const avgHours = hoursList.length ? hoursList.reduce((a, b) => a + b, 0) / hoursList.length : 0;
-  const hours = hoursList.length ? Math.min(1, avgHours / TARGET_HOURS) : 1;
-
-  const short = here.filter((d) => (d.workMin ?? 0) > 0 && (d.workMin ?? 0) < rule.requiredMin);
-  const avgShortMin = short.length
-    ? Math.round(short.reduce((a, d) => a + rule.requiredMin - (d.workMin ?? 0), 0) / short.length)
-    : 0;
-  let onTimeDays = 0;
-  let sample = 0;
-  for (const d of here) {
-    const arrival = arrivalMinutes({
-      workDate: d.workDate,
-      status: d.status,
-      inAt: d.inAt,
-      outAt: null,
-      workMin: d.workMin,
-    });
-    const fullDuty = (d.workMin ?? 0) >= rule.requiredMin;
-    if (arrival === null && !fullDuty) continue; // nothing to judge this day on
-    sample++;
-    if (fullDuty || (arrival !== null && arrival <= rule.startMin + rule.graceMin)) onTimeDays++;
-  }
-  const punctuality = sample ? onTimeDays / sample : 1;
-
-  // Nobody attended: the neutral hours/punctuality parts would otherwise hand out 30% for a month
-  // of absence. The sheet zeroed this too (its J column: IF(present days = 0, 0, ...)).
-  const raw = here.length
-    ? 100 *
-      (ATTENDANCE_BLEND.presence * presence +
-        ATTENDANCE_BLEND.hours * hours +
-        ATTENDANCE_BLEND.punctuality * punctuality)
-    : 0;
+  const withHours = here.filter((d) => (d.workMin ?? 0) > 0);
+  const short = withHours.filter((d) => (d.workMin ?? 0) < rule.requiredMin);
+  const raw = here.length && expectedMin > 0 ? Math.min(100, (workedMin / expectedMin) * 100) : 0;
   return {
     attendedDays: here.length,
-    creditDays: round1(creditDays),
     attendedDates: [...new Set(here.map((d) => d.workDate))].sort(),
-    avgHours: round1(avgHours),
-    presence,
-    hours,
-    punctuality,
-    onTimeDays,
-    punctualitySample: sample,
+    workedHours: round1(workedMin / 60),
+    expectedHours: round1(expectedMin / 60),
+    avgHours: withHours.length ? round1(workedMin / 60 / withHours.length) : 0,
     shortDays: short.length,
-    avgShortMin,
-    halfDays: days.filter((d) => d.status === "Half Day").length,
+    avgShortMin: short.length
+      ? Math.round(short.reduce((a, d) => a + rule.requiredMin - (d.workMin ?? 0), 0) / short.length)
+      : 0,
+    overtimeHours: round1(
+      withHours.reduce((a, d) => a + Math.max(0, (d.workMin ?? 0) - rule.requiredMin), 0) / 60,
+    ),
     raw: round1(raw),
   };
 }

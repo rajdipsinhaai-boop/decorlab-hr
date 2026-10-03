@@ -42,15 +42,15 @@ beforeAll(async () => {
 describe("status derivation", () => {
   it.each([
     ["PR", "PR", "Present"],
-    ["PR", "AB", "Half Day"],
-    ["AB", "PR", "Half Day"],
+    ["PR", "AB", "Present"],
+    ["AB", "PR", "Present"],
     ["AB", "AB", "Absent"],
     ["WO", "WO", "Week Off"],
     ["PH", "PH", "Holiday"],
     ["PL", "PL", "Leave"],
     ["PR", "IN", "Incomplete"],
     ["IN", "AB", "Incomplete"],
-    ["PL", "PR", "Half Day"],
+    ["PL", "PR", "Present"],
     ["XX", "YY", "Unknown"],
   ])("%s + %s -> %s", (a, b, want) => expect(deriveStatus(a, b)).toBe(want));
 });
@@ -74,11 +74,8 @@ describe("names and months", () => {
 });
 
 describe("full days and holidays", () => {
-  it("counts a late arrival who works the full 8h30 (or more) as a full day", () => {
-    expect(dayOutcome("AB", "PR", 510, "2026-09-02")).toBe("Present"); // late in, 8h30 done
-    expect(dayOutcome("PR", "AB", 600, "2026-09-02")).toBe("Present"); // overtime
-    expect(dayOutcome("AB", "PR", 480, "2026-09-02")).toBe("Half Day"); // genuinely short
-    expect(dayOutcome("AB", "PR", null, "2026-09-02")).toBe("Half Day");
+  it("has no half day: anyone who attended is Present and their hours are what is graded", () => {
+    for (const mins of [null, 240, 480, 510, 600]) expect(dayOutcome("AB", "PR", mins, "2026-09-02")).toBe("Present");
   });
   it("makes a holiday a holiday for everyone, whatever the punches say", () => {
     const hol = new Set(["2026-09-18"]);
@@ -87,7 +84,7 @@ describe("full days and holidays", () => {
     expect(dayOutcome("AB", "AB", null, "2026-09-19", hol)).toBe("Absent");
   });
   it("treats a biometric holiday that we did not declare as a working day when the person punched in", () => {
-    expect(dayOutcome("PH", "PH", 497, "2026-09-17", new Set(), true)).toBe("Half Day");
+    expect(dayOutcome("PH", "PH", 497, "2026-09-17", new Set(), true)).toBe("Present");
     expect(dayOutcome("PH", "PH", 519, "2026-09-17", new Set(), true)).toBe("Present");
     expect(dayOutcome("PH", "PH", null, "2026-09-17", new Set(), true)).toBe("Incomplete");
     expect(dayOutcome("PH", "PH", null, "2026-09-17")).toBe("Holiday"); // nobody came in: still a holiday
@@ -162,9 +159,9 @@ describe("import plan for the September 2026 report", () => {
   it("computes each person's month from the records (independently checked figures)", () => {
     const plan = planImport(report, ctx());
     const of = (id: string) => plan.stats.people.find((p) => p.cosecId === id)!.summary!;
-    expect(of("D103")).toEqual({ presentDays: 24, halfDays: 24, absentDays: 2, leaveDays: 0, avgHours: 7.1, punctualityDeviation: 64 });
-    expect(of("D115")).toEqual({ presentDays: 22, halfDays: 3, absentDays: 3, leaveDays: 0, avgHours: 9.2, punctualityDeviation: -7 });
-    expect(of("D108")).toEqual({ presentDays: 25, halfDays: 0, absentDays: 1, leaveDays: 0, avgHours: 8.6, punctualityDeviation: -14 });
+    expect(of("D103")).toEqual({ presentDays: 24, totalHours: 171.4, absentDays: 2, leaveDays: 0, avgHours: 7.1, punctualityDeviation: 64 });
+    expect(of("D115")).toEqual({ presentDays: 22, totalHours: 202.8, absentDays: 3, leaveDays: 0, avgHours: 9.2, punctualityDeviation: -7 });
+    expect(of("D108")).toEqual({ presentDays: 25, totalHours: 214.8, absentDays: 1, leaveDays: 0, avgHours: 8.6, punctualityDeviation: -14 });
     expect(of("D113")).toMatchObject({ presentDays: 21, leaveDays: 3, absentDays: 2 });
   });
 });
