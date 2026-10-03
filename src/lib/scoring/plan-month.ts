@@ -1,4 +1,4 @@
-import { workingDaysInMonth } from "../attendance/metrics";
+import { holidayDates, workingDaysInMonth } from "../attendance/metrics";
 import { monthLabel } from "../attendance/normalize";
 import { rankMonth, computeScore } from "./engine";
 import { buildScoreCard } from "./score-card";
@@ -32,6 +32,8 @@ export interface MonthData {
   audit: Map<string, AuditPerson>;
   claudeScores?: Map<string, number>;
   rules: Record<RoleGroup, DutyRule>;
+  /** Official holiday dates (YYYY-MM-DD) from the holiday calendar. */
+  holidays?: string[];
   now?: Date;
 }
 
@@ -81,12 +83,14 @@ export function planMonthScores(data: MonthData): {
   cards: Map<string, ScoreCardModel>;
   summary: { scored: number; pending: number; companyAverage: number | null };
 } {
-  const workingDays = workingDaysInMonth(data.monthKey);
+  // Holidays are nobody's absence: they leave the denominator and anything punched on them is ignored.
+  const off = holidayDates(data.holidays ?? [], data.attendance);
+  const workingDays = workingDaysInMonth(data.monthKey, off);
   const label = monthLabel(data.monthKey);
   const results = [];
 
   for (const e of data.employees) {
-    const attendance = data.attendance.filter((a) => a.employeeId === e.id);
+    const attendance = data.attendance.filter((a) => a.employeeId === e.id && !off.has(a.workDate));
     const ratings = ratingsFor(e, data.params, data.ratings);
     const audit = data.audit.get(e.id) ?? null;
     const hasRating = ratings.some((r) => r.rating !== null);

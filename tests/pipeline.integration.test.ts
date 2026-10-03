@@ -139,7 +139,7 @@ describe("September upload", () => {
     expect(d.monthInfo[1]).toEqual({ month: "September 2026", hasAttendance: true, hasScores: false });
     expect(d.employees).toHaveLength(12);
     const sibhu = d.employees.find((e) => e.name === "Sibhu Das")!;
-    expect(sibhu).toMatchObject({ score: null, rag: null, presentDays: 23, halfDays: 23, absentDays: 2, avgHours: 7.2, punctualityDeviation: 4, hasAttendance: true });
+    expect(sibhu).toMatchObject({ score: null, rag: null, presentDays: 24, halfDays: 24, absentDays: 2, avgHours: 7.1, punctualityDeviation: 4, hasAttendance: true });
     expect(sibhu.days).toHaveLength(30);
     expect(sibhu.days[0]).toMatchObject({ date: "01/09/2026", day: "Tuesday", status: "Half Day", inTime: "11:30", outTime: "18:41" });
     expect(d.employees.every((e) => e.score === null)).toBe(true);

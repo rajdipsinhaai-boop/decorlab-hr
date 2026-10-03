@@ -70,6 +70,13 @@ export async function loadMatchContext(): Promise<MatchContext> {
   };
 }
 
+/** Official holiday dates (YYYY-MM-DD) from the holidays table. */
+export async function loadHolidays(): Promise<Set<string>> {
+  const { data, error } = await db().from("holidays").select("holiday_date");
+  if (error) throw new Error(error.message);
+  return new Set((data ?? []).map((h: any) => String(h.holiday_date)));
+}
+
 async function markUpload(id: string, patch: Record<string, unknown>) {
   const { error } = await db().from("attendance_uploads").update(patch).eq("id", id);
   if (error) throw new Error(error.message);
@@ -88,7 +95,7 @@ export async function runAttendanceImport(job: Job): Promise<Record<string, unkn
     if (dlError || !blob) throw new Error(`Could not read the stored file: ${dlError?.message ?? "empty"}`);
 
     const report = await parseAttendanceFile(new Uint8Array(await blob.arrayBuffer()));
-    const plan = planImport(report, await loadMatchContext());
+    const plan = planImport(report, await loadMatchContext(), await loadHolidays());
 
     const { error: rpcError } = await db().rpc("import_attendance_records", {
       p_upload_id: uploadId,

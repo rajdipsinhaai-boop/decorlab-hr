@@ -277,18 +277,18 @@ const STATUS_COLOR: Record<string, RGB> = {
   Holiday: rgb(0.8, 0.8, 0.8),
 };
 
-/** Optional second page: the attendance calendar and the DPR days behind the numbers. */
+/**
+ * The attendance calendar and graded DPR days. They flow on from the previous section instead of
+ * forcing a new page, so a card stays on two pages and only spills onto a third when it cannot fit.
+ */
 function evidence(c: Ctx, days: AttendanceDay[], dpr: DprActivityEntry[]) {
   if (!days.length && !dpr.length) return;
-  footer(c);
-  newPage(c);
-  c.y = 64;
-  c.page.drawText(winAnsi(`${c.model.name} - evidence behind the numbers`), { x: M, y: yy(c), size: 12, font: c.bold, color: NAVY });
-  c.y += 6;
   if (days.length) {
-    heading(c, "ATTENDANCE THIS MONTH");
     const cell = 26;
     const perRow = Math.floor((W - M * 2) / (cell + 4));
+    // heading + calendar + legend stay together: they move to the next page as one block
+    ensure(c, 48 + Math.ceil(days.length / perRow) * (cell + 4) + 24);
+    heading(c, "ATTENDANCE THIS MONTH");
     days.forEach((d, i) => {
       const x = M + (i % perRow) * (cell + 4);
       const ty = c.y + Math.floor(i / perRow) * (cell + 4);

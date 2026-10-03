@@ -103,6 +103,30 @@ export function deriveStatus(first: string, second: string): DayStatus {
   return "Unknown";
 }
 
+/** Minutes of duty that make a full day (8h30). */
+export const FULL_DAY_MIN = 510;
+
+/**
+ * The stored outcome for a day. The biometric system calls a late arrival "half day" even when the
+ * person stayed on and worked a full day, so a half day with a full day's hours (overtime included)
+ * is a Present day. Days on our holiday calendar are never anything else, whatever the punches say.
+ */
+export function dayOutcome(
+  first: string,
+  second: string,
+  workMin: number | null,
+  workDate: string,
+  holidays: ReadonlySet<string> = new Set(),
+  punched = false,
+): DayStatus {
+  if (holidays.has(workDate)) return "Holiday";
+  const status = deriveStatus(first, second);
+  // Our holiday calendar is the authority. If the biometric calendar calls a day a holiday that is
+  // not on ours and the person punched in and worked, it was a working day.
+  if (status === "Holiday" && punched) return (workMin ?? 0) >= FULL_DAY_MIN ? "Present" : workMin ? "Half Day" : "Incomplete";
+  return status === "Half Day" && (workMin ?? 0) >= FULL_DAY_MIN ? "Present" : status;
+}
+
 export const KNOWN_HALF_CODES = new Set(["PR", "AB", "WO", "PH", "IN", ...LEAVE_CODES]);
 
 /** "YYYY-MM-DD" from dd/mm/yyyy; null when malformed or not a real date. */

@@ -79,7 +79,7 @@ export async function computeMonth(monthKey: string, opts: { force?: boolean } =
   if (legacy.count && !opts.force) return { ...outcome, skipped: "legacy" };
 
   const label = monthLabel(monthKey);
-  const [emp, ali, params, rules, ratings, attendance] = await Promise.all([
+  const [emp, ali, params, rules, ratings, attendance, holidays] = await Promise.all([
     db().from("employees").select("id, name, role, role_group, status").order("id"),
     db().from("employee_aliases").select("alias_key, employee_id"),
     db().from("kra_parameters").select("*"),
@@ -96,8 +96,9 @@ export async function computeMonth(monthKey: string, opts: { force?: boolean } =
         .not("employee_id", "is", null)
         .range(from, to),
     ),
+    db().from("holidays").select("holiday_date"),
   ]);
-  for (const r of [emp, ali, params, rules, ratings]) if (r.error) throw new Error(r.error.message);
+  for (const r of [emp, ali, params, rules, ratings, holidays]) if (r.error) throw new Error(r.error.message);
 
   const employees: MonthEmployee[] = (emp.data ?? []).filter(
     (e: any) => String(e.status).toLowerCase() !== "inactive",
@@ -121,6 +122,7 @@ export async function computeMonth(monthKey: string, opts: { force?: boolean } =
     audit: audit.people,
     claudeScores: audit.claudeScores,
     rules: dutyRulesFrom(rules.data ?? []),
+    holidays: (holidays.data ?? []).map((h: any) => String(h.holiday_date)),
   });
 
   if (plan.rows.length) {

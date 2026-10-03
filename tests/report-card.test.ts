@@ -109,7 +109,23 @@ describe("report card PDF", () => {
     expect(all).toContain("WHAT IS STILL NEEDED");
     expect(all).toContain("director ratings (5 of 6 KRA parameters rated)");
     expect(all).toContain("Pending");
-    expect(pages).toBe(2);
+    expect(pages).toBeLessThanOrEqual(2);
+  });
+
+  it("keeps a full supervisor card with attendance and DPR evidence on two pages", async () => {
+    const { result, ratings, a, days } = supervisor();
+    const model = buildScoreCard({ name: "Arunava Mallick", role: "Site Supervisor", roleGroup: "supervisor", month: "September 2026", result, ratings, audit: a });
+    const bytes = await buildReportCardPdf(model, {
+      evidence: {
+        days: days.map((d) => ({ date: `${d.workDate.slice(8)}/09/2026`, day: "", status: "Present", inTime: "10:10", outTime: "18:30", hours: 8.4 })),
+        dpr: a.dprDays.map((d) => ({ date: d.date, grade: d.grade, summary: d.note, blockers: "", plan: "" })),
+      },
+    });
+    save("supervisor-evidence.pdf", bytes);
+    const { all, pages } = await text(bytes);
+    expect(all).toContain("ATTENDANCE THIS MONTH");
+    expect(all).toContain("DPR REPORTS GRADED");
+    expect(pages).toBeLessThanOrEqual(2);
   });
 
   it("copes with long text and non-Latin characters without throwing", async () => {

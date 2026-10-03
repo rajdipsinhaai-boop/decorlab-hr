@@ -2,10 +2,10 @@ import { readFileSync } from "node:fs";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { MatchContext } from "@/lib/attendance/match";
 import { resolveIdentity } from "@/lib/attendance/match";
-import { currentMonthKey, deriveStatus, monthKeysBetween, monthKeyOf, monthLabel, normalizeName } from "@/lib/attendance/normalize";
+import { currentMonthKey, dayOutcome, deriveStatus, monthKeysBetween, monthKeyOf, monthLabel, normalizeName } from "@/lib/attendance/normalize";
 import { parseAttendanceFile } from "@/lib/attendance/parse.server";
 import { planImport } from "@/lib/attendance/plan";
-import { workingDaysInMonth } from "@/lib/attendance/metrics";
+import { holidayDates, workingDaysInMonth } from "@/lib/attendance/metrics";
 import type { ParsedReport } from "@/lib/attendance/types";
 
 // The roster exactly as the migration seeds it.
@@ -73,6 +73,39 @@ describe("names and months", () => {
   });
 });
 
+describe("full days and holidays", () => {
+  it("counts a late arrival who works the full 8h30 (or more) as a full day", () => {
+    expect(dayOutcome("AB", "PR", 510, "2026-09-02")).toBe("Present"); // late in, 8h30 done
+    expect(dayOutcome("PR", "AB", 600, "2026-09-02")).toBe("Present"); // overtime
+    expect(dayOutcome("AB", "PR", 480, "2026-09-02")).toBe("Half Day"); // genuinely short
+    expect(dayOutcome("AB", "PR", null, "2026-09-02")).toBe("Half Day");
+  });
+  it("makes a holiday a holiday for everyone, whatever the punches say", () => {
+    const hol = new Set(["2026-09-18"]);
+    expect(dayOutcome("AB", "AB", null, "2026-09-18", hol)).toBe("Holiday");
+    expect(dayOutcome("IN", "AB", null, "2026-09-18", hol)).toBe("Holiday");
+    expect(dayOutcome("AB", "AB", null, "2026-09-19", hol)).toBe("Absent");
+  });
+  it("treats a biometric holiday that we did not declare as a working day when the person punched in", () => {
+    expect(dayOutcome("PH", "PH", 497, "2026-09-17", new Set(), true)).toBe("Half Day");
+    expect(dayOutcome("PH", "PH", 519, "2026-09-17", new Set(), true)).toBe("Present");
+    expect(dayOutcome("PH", "PH", null, "2026-09-17", new Set(), true)).toBe("Incomplete");
+    expect(dayOutcome("PH", "PH", null, "2026-09-17")).toBe("Holiday"); // nobody came in: still a holiday
+    expect(dayOutcome("PH", "PH", 519, "2026-09-17", new Set(["2026-09-17"]), true)).toBe("Holiday");
+  });
+  it("removes holidays (not Sundays twice) from the working days", () => {
+    expect(workingDaysInMonth("2026-09", ["2026-09-18"])).toBe(25);
+    expect(workingDaysInMonth("2026-09", ["2026-09-06"])).toBe(26); // a Sunday
+    const recs = [
+      { workDate: "2026-09-17", status: "Holiday" },
+      { workDate: "2026-09-17", status: "Holiday" },
+      { workDate: "2026-09-17", status: "Present" },
+      { workDate: "2026-09-16", status: "Present" },
+    ];
+    expect([...holidayDates(["2026-09-18"], recs)].sort()).toEqual(["2026-09-17", "2026-09-18"]);
+  });
+});
+
 describe("identity matching", () => {
   it("matches by biometric id first, even when the name is spelled differently", () => {
     expect(resolveIdentity({ cosecId: "D114", name: "SUSHOVAN HALDAR" }, ctx())).toMatchObject({
@@ -129,9 +162,9 @@ describe("import plan for the September 2026 report", () => {
   it("computes each person's month from the records (independently checked figures)", () => {
     const plan = planImport(report, ctx());
     const of = (id: string) => plan.stats.people.find((p) => p.cosecId === id)!.summary!;
-    expect(of("D103")).toEqual({ presentDays: 23, halfDays: 23, absentDays: 2, leaveDays: 0, avgHours: 7.2, punctualityDeviation: 64 });
+    expect(of("D103")).toEqual({ presentDays: 24, halfDays: 24, absentDays: 2, leaveDays: 0, avgHours: 7.1, punctualityDeviation: 64 });
     expect(of("D115")).toEqual({ presentDays: 22, halfDays: 3, absentDays: 3, leaveDays: 0, avgHours: 9.2, punctualityDeviation: -7 });
     expect(of("D108")).toEqual({ presentDays: 25, halfDays: 0, absentDays: 1, leaveDays: 0, avgHours: 8.6, punctualityDeviation: -14 });
-    expect(of("D113")).toMatchObject({ presentDays: 20, leaveDays: 3, absentDays: 2 });
+    expect(of("D113")).toMatchObject({ presentDays: 21, leaveDays: 3, absentDays: 2 });
   });
 });

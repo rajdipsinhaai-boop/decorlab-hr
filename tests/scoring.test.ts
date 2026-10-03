@@ -10,6 +10,7 @@ import {
 } from "@/lib/scoring/attendance-score";
 import { combine, computeScore, rankMonth } from "@/lib/scoring/engine";
 import { buildScoreCard } from "@/lib/scoring/score-card";
+import { buildNarrative } from "@/lib/scoring/narrative";
 import type { AttDay, AuditPerson, DutyRule, RatingIn, RoleGroup, ScoreInput } from "@/lib/scoring/types";
 import { DEFAULT_DUTY_RULES } from "@/lib/scoring/constants";
 
@@ -340,5 +341,35 @@ describe("report card model and comments", () => {
     const card = buildScoreCard({ name: "X", roleGroup: "ea", month: "September 2026", result, ratings: [], audit: null });
     expect(card.finalScore).toBeNull();
     expect(card.why[0]).toContain("waiting for director ratings");
+  });
+});
+
+describe("short-day advice", () => {
+  it("tells someone who keeps leaving before 8h30 to stay on after a late start", () => {
+    const att = Array.from({ length: 20 }, (_, i) => {
+      const date = `2026-09-${String(i + 1).padStart(2, "0")}`;
+      return { workDate: date, status: i < 12 ? "Half Day" : "Present", inAt: `${date}T11:40:00`, workMin: i < 12 ? 420 : 520 };
+    });
+    const ratings = [{ name: "A", weight: 1, rating: 4 }];
+    const result = computeScore({ role: "supervisor", workingDays: 26, attendance: att, audit: null, ratings, rules: DEFAULT_DUTY_RULES });
+    expect(result.facts.shortDays).toBe(12);
+    const { why, improve } = buildNarrative("supervisor", { ...result, status: "scored" }, ratings, null);
+    expect(why.join(" ")).toContain("12 days ended short");
+    expect(improve.join(" ")).toContain("stay on to make up the hours");
+  });
+});
+
+describe("short days cost attendance", () => {
+  it("credits a day in proportion to the duty completed, and a late start that is made up in full", () => {
+    const day = (n: number, workMin: number | null): AttDay => ({
+      workDate: `2026-09-${String(n).padStart(2, "0")}`, status: "Present", inAt: `2026-09-${String(n).padStart(2, "0")}T12:00:00`, workMin,
+    });
+    const full = attendanceBlend([day(1, 510), day(2, 600), day(3, 510), day(4, 510)], 4, RULES.designer);
+    expect(full.presence).toBe(1); // late in, 8h30+ worked: no penalty
+    const cut = attendanceBlend([day(1, 510), day(2, 255), day(3, 510), day(4, 510)], 4, RULES.designer);
+    expect(cut.creditDays).toBe(3.5); // one half-length day = half a day
+    expect(cut.presence).toBeCloseTo(0.875);
+    expect(cut.raw).toBeLessThan(full.raw);
+    expect(attendanceBlend([day(1, null)], 1, RULES.designer).presence).toBe(1); // no hours recorded: not judged
   });
 });
