@@ -275,11 +275,15 @@ export const finalizeMonth = createServerFn({ method: "POST" })
     const { runWorker } = await import("./jobs/worker.server");
     const job = await enqueue("report.generate", { monthKey: key }, { createdBy: email });
     await runWorker({ jobId: job.id, budgetMs: 40_000 });
-    // Then send each person their card on WhatsApp. A problem here never undoes the finalize:
-    // the job retries on its own and skips anyone already sent.
+    // Then send each person their card on WhatsApp, but only once the PDFs are actually stored (if
+    // generation is still retrying, use "Send now" on the WhatsApp tab later). A problem here never
+    // undoes the finalize: the job retries on its own and skips anyone already sent.
     try {
-      const wa = await enqueue("report.whatsapp", { monthKey: key }, { createdBy: email });
-      await runWorker({ jobId: wa.id, budgetMs: 40_000 });
+      const { getJob } = await import("./jobs/queue.server");
+      if ((await getJob(job.id))?.status === "done") {
+        const wa = await enqueue("report.whatsapp", { monthKey: key }, { createdBy: email });
+        await runWorker({ jobId: wa.id, budgetMs: 40_000 });
+      }
     } catch (error) {
       console.error("WhatsApp send could not start:", error);
     }
@@ -791,7 +795,7 @@ export interface WhatsAppRow {
   name: string;
   role: string;
   phone: string | null;
-  status: "sent" | "failed" | "pending";
+  status: "sent" | "failed" | "pending" | "test";
   error: string | null;
   sentAt: string | null;
 }

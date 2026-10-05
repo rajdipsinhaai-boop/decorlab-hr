@@ -38,7 +38,7 @@ export async function runReportWhatsApp(job: Job): Promise<Record<string, unknow
       continue;
     }
     const to = normalizePhone(e.phone);
-    const record = (status: "sent" | "failed", error: string | null, response: string | null) =>
+    const record = (status: "sent" | "failed" | "test", error: string | null, response: string | null) =>
       db()
         .from("whatsapp_deliveries")
         .upsert(
@@ -51,9 +51,12 @@ export async function runReportWhatsApp(job: Job): Promise<Record<string, unknow
       out.failed.push(`${e.name}: no phone number`);
       continue;
     }
-    const { data: signed, error: signError } = await supabaseAdmin.storage
-      .from(REPORT_BUCKET)
-      .createSignedUrl(reportPath(monthKey, e.id), LINK_SECONDS);
+    // A signed link can be made for a file that does not exist, so check the file is really there.
+    const path = reportPath(monthKey, e.id);
+    const exists = await supabaseAdmin.storage.from(REPORT_BUCKET).exists(path);
+    const { data: signed, error: signError } = exists.data
+      ? await supabaseAdmin.storage.from(REPORT_BUCKET).createSignedUrl(path, LINK_SECONDS)
+      : { data: null, error: exists.error ?? new Error("file not found") };
     if (signError || !signed?.signedUrl) {
       await record("failed", `No stored report PDF: ${signError?.message ?? "missing"}`, null);
       out.failed.push(`${e.name}: no stored PDF`);
@@ -66,7 +69,8 @@ export async function runReportWhatsApp(job: Job): Promise<Record<string, unknow
     try {
       const res = await sendTemplate(cfg, {
         to,
-        idempotencyKey: `report-${monthKey}-${e.id}`,
+        // a test send must never use up the key of the real one
+        idempotencyKey: cfg.testTo ? `report-test-${monthKey}-${e.id}-${Date.now()}` : `report-${monthKey}-${e.id}`,
         components: reportComponents({
           name: e.name,
           month: label,
@@ -75,7 +79,8 @@ export async function runReportWhatsApp(job: Job): Promise<Record<string, unknow
         }),
       });
       if (res.ok) {
-        await record("sent", null, res.body);
+        // In test mode the message went to the test number, so it must not count as sent to the person.
+        await record(cfg.testTo ? "test" : "sent", null, res.body);
         out.sent++;
       } else {
         await record("failed", `HTTP ${res.status}`, res.body);
