@@ -3,10 +3,12 @@
 // and the matching allowed_emails rows from a CSV. Dry run unless --apply is passed.
 //
 //   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... DEFAULT_EMPLOYEE_PASSWORD=... \
-//     node scripts/provision-accounts.mjs people.csv [--apply] [--allow-demote]
+//     node scripts/provision-accounts.mjs people.csv [--apply] [--allow-demote] [--reset-unused]
 //
 // CSV header: email,name,employee_id,position,role      (role = admin | manager | employee)
 // Existing Auth users are never touched (password kept); only their allowed_emails row is updated.
+// --reset-unused: existing users in the CSV who have never signed in get the default password again
+// (and must change it on first login). Anyone who has signed in is still left alone.
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 
@@ -14,6 +16,7 @@ const args = process.argv.slice(2);
 const file = args.find((a) => !a.startsWith("--"));
 const apply = args.includes("--apply");
 const allowDemote = args.includes("--allow-demote");
+const resetUnused = args.includes("--reset-unused");
 const ROLES = ["admin", "manager", "employee"];
 
 function fail(message) {
@@ -73,12 +76,12 @@ for (const p of people) {
 
 const supabase = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
-async function existingAuthEmails() {
-  const found = new Set();
+async function existingAuthUsers() {
+  const found = new Map();
   for (let page = 1; ; page++) {
     const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 });
     if (error) fail(`Could not list Auth users: ${error.message}`);
-    data.users.forEach((u) => u.email && found.add(u.email.toLowerCase()));
+    data.users.forEach((u) => u.email && found.set(u.email.toLowerCase(), u));
     if (data.users.length < 1000) return found;
   }
 }
@@ -92,10 +95,10 @@ const hasPosition = !positionError;
 if (!hasPosition)
   console.log("Note: allowed_emails has no position column (run 202610020001_allowed_emails_position.sql to store job titles).");
 const currentRole = new Map(listRows.map((r) => [r.email.toLowerCase(), r.role]));
-const authEmails = await existingAuthEmails();
+const authUsers = await existingAuthUsers();
 
 console.log(`${apply ? "APPLY" : "DRY RUN"}: ${people.length} people from ${file}\n`);
-const result = { created: 0, existing: 0, listed: 0, failed: 0, blocked: 0 };
+const result = { created: 0, reset: 0, existing: 0, listed: 0, failed: 0, blocked: 0 };
 
 for (const p of people) {
   const had = currentRole.get(p.email);
@@ -105,9 +108,12 @@ for (const p of people) {
     result.blocked++;
     continue;
   }
-  const needsAccount = !authEmails.has(p.email);
+  const user = authUsers.get(p.email);
+  const needsAccount = !user;
+  // Never signed in = nobody has chosen a password yet, so putting the default back loses nothing.
+  const needsReset = resetUnused && user && !user.last_sign_in_at;
   console.log(
-    `${needsAccount ? "CREATE  " : "EXISTS  "} ${mask(p.email)}  ${p.role}${p.position ? ` / ${p.position}` : ""}` +
+    `${needsAccount ? "CREATE  " : needsReset ? "RESET   " : "EXISTS  "} ${mask(p.email)}  ${p.role}${p.position ? ` / ${p.position}` : ""}` +
       `${had && had !== p.role ? `  (role ${had} -> ${p.role})` : ""}`,
   );
   if (!apply) continue;
@@ -129,6 +135,17 @@ for (const p of people) {
   }
   result.listed++;
 
+  if (needsReset) {
+    const { error: resetError } = await supabase.auth.admin.updateUserById(user.id, {
+      password: defaultPassword,
+      app_metadata: { must_change_password: true },
+    });
+    if (resetError) {
+      console.log(`  FAILED reset: ${resetError.message}`);
+      result.failed++;
+    } else result.reset++;
+    continue;
+  }
   if (!needsAccount) { result.existing++; continue; }
   const { error: createError } = await supabase.auth.admin.createUser({
     email: p.email,

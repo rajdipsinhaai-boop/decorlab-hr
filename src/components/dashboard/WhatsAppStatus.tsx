@@ -81,7 +81,7 @@ export function WhatsAppStatus({ month }: { month: string }) {
             ) : null}
           </div>
           <p className="text-xs text-muted-foreground">
-            {count("sent")} sent · {count("failed")} failed · {count("pending")} not sent yet
+            {count("sent")} sent · {count("failed")} failed · {count("pending") + count("test")} not sent yet{count("test") ? ` (${count("test")} only tested)` : ""}
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
