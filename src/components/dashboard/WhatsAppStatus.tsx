@@ -9,6 +9,7 @@ const TONE = {
   sent: "border-success/40 bg-success/10 text-success",
   failed: "border-danger/40 bg-danger/10 text-danger",
   pending: "border-border bg-muted/30 text-muted-foreground",
+  test: "border-warning/40 bg-warning/10 text-warning",
 } as const;
 
 /** Admin view of the WhatsApp report-card send for the selected month. */
@@ -103,7 +104,7 @@ export function WhatsAppStatus({ month }: { month: string }) {
                     <td className="px-2 tabular-nums">{r.phone ?? "—"}</td>
                     <td className="px-2">
                       <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${TONE[r.status]}`}>
-                        {r.status === "pending" ? "Not sent" : r.status === "sent" ? "Sent" : "Failed"}
+                        {r.status === "pending" ? "Not sent" : r.status === "sent" ? "Sent" : r.status === "test" ? "Test only" : "Failed"}
                       </span>
                     </td>
                     <td className="px-2 text-muted-foreground">
