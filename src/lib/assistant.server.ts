@@ -1,9 +1,69 @@
 /** Server-only, read-only HR assistant backed by an optional OpenAI-compatible provider. */
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { generateText } from "ai";
+import { monthLabel } from "./attendance/normalize";
 import { loadDashboard } from "./hr.server";
 
 const MODEL = process.env.OPENAI_MODEL ?? "gpt-6-luna";
+
+/** One person's stored score for one month (from monthly_scores). */
+export interface ScoreHistoryRow {
+  month_key: string;
+  employee_id: string;
+  final_score: number | string | null;
+  rag: string | null;
+  rank_in_role: number | null;
+  overall_rank: number | null;
+  breakdown: { label: string; weight: number; score: number }[] | null;
+  details: { facts?: Record<string, unknown> } | null;
+}
+
+const num = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v));
+
+/**
+ * Every month on record, per person, for comparisons, trends and year-end averages. Older months carry
+ * the score, rank and each part's score (and hours / warning where the month stored them); the latest
+ * month's full detail is in `employees`.
+ */
+export function compactHistory(rows: ScoreHistoryRow[], names: Map<string, string>) {
+  const byPerson = new Map<string, ScoreHistoryRow[]>();
+  for (const r of rows) byPerson.set(r.employee_id, [...(byPerson.get(r.employee_id) ?? []), r]);
+  const people = [...byPerson.entries()].map(([id, list]) => {
+    const months = list
+      .sort((a, b) => a.month_key.localeCompare(b.month_key))
+      .map((r) => {
+        const facts = r.details?.facts ?? {};
+        return {
+          month: monthLabel(r.month_key),
+          score: num(r.final_score),
+          rag: r.rag,
+          rankInRole: r.rank_in_role,
+          overallRank: r.overall_rank,
+          parts: (r.breakdown ?? []).map((b) => ({ part: b.label, weight: b.weight, score: b.score })),
+          ...(facts["workedHours"] !== undefined ? { hoursWorked: facts["workedHours"], expectedHours: facts["expectedHours"] } : {}),
+          ...(facts["warningUsed"] ? { warningUsed: true } : {}),
+        };
+      });
+    const scored = months.filter((m) => m.score !== null) as { score: number }[];
+    return {
+      name: names.get(id) ?? id,
+      monthsScored: scored.length,
+      averageScore: scored.length ? Math.round((scored.reduce((a, m) => a + m.score, 0) / scored.length) * 10) / 10 : null,
+      months,
+    };
+  });
+  const perMonth = new Map<string, number[]>();
+  for (const r of rows) {
+    const v = num(r.final_score);
+    if (v !== null) perMonth.set(r.month_key, [...(perMonth.get(r.month_key) ?? []), v]);
+  }
+  return {
+    companyAveragePerMonth: [...perMonth.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => ({ month: monthLabel(k), average: Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 10) / 10, people: v.length })),
+    people,
+  };
+}
 
 /** How scores are built, in plain words, so the assistant can explain a number without guessing. */
 const HOW_SCORES_WORK = [
@@ -14,13 +74,17 @@ const HOW_SCORES_WORK = [
   "RAG: GREEN 75% and above, YELLOW 60-75%, RED below 60%.",
 ].join(" ");
 
-export function compactContext(data: Awaited<ReturnType<typeof loadDashboard>>) {
+export function compactContext(
+  data: Awaited<ReturnType<typeof loadDashboard>>,
+  history?: ReturnType<typeof compactHistory>,
+) {
   return {
     month: data.month,
     locked: Boolean(data.locked),
     targetHours: data.targetHours,
     ragBands: { RED: "<60%", YELLOW: "60-75%", GREEN: ">=75%" },
     howScoresWork: HOW_SCORES_WORK,
+    ...(history ? { allMonths: history } : {}),
     employees: data.employees.map((e) => ({
       name: e.name,
       role: e.role,
@@ -56,12 +120,22 @@ export async function answerQuestion(
   }
 
   const data = await loadDashboard();
+  // every stored month, so questions can compare months or average across the year
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const stored = await (supabaseAdmin as any)
+    .from("monthly_scores")
+    .select("month_key, employee_id, final_score, rag, rank_in_role, overall_rank, breakdown, details");
+  if (stored.error) throw new Error(stored.error.message);
+  const allMonths = compactHistory(
+    (stored.data ?? []) as ScoreHistoryRow[],
+    new Map(data.employees.map((e) => [e.id, e.name])),
+  );
   const system = [
-    "You are the Decorlab HR analytics assistant. Answer questions about this month's grading using ONLY the JSON data provided below.",
+    "You are the Decorlab HR analytics assistant. Answer questions about the team's grading using ONLY the JSON data provided below. 'employees' is the latest month in full detail; 'allMonths' has every month on record per person (score, rank, each part, hours, averageScore and monthsScored) and the company average per month, so use it for comparisons, trends and averages across months. Older months have scores and parts only, not the written reasons; say so if asked why for an older month.",
     "You are strictly read-only: you cannot edit the spreadsheet, upload files, or trigger report generation. If asked to do any of those, say so and point the user to the dashboard buttons.",
     "If the data does not contain the answer, say plainly that it is not available in the current sheet data instead of guessing.",
     "Keep every answer short and simple: a sentence or two, or a few short bullets, with the actual numbers. Explain a score using the person's own parts, explanations and howScoresWork. RAG bands: RED below 60%, YELLOW 60-75%, GREEN 75% and above.",
-    `DATA: ${JSON.stringify(compactContext(data))}`,
+    `DATA: ${JSON.stringify(compactContext(data, allMonths))}`,
   ].join("\n\n");
 
   const messages = [
