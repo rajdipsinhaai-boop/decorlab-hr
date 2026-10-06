@@ -15,10 +15,33 @@ import {
   type RatingRow,
   type ScoreRow,
 } from "./dashboard-build";
-import type { ControlRow, DashboardData } from "./hr-types";
+import type { ControlRow, DashboardData, MonthHistoryEntry, Rag } from "./hr-types";
 
 // The roster, attendance, scores and jobs tables are not in the generated Supabase types yet.
 const db = () => supabaseAdmin as any;
+
+/** One person's score for every month on record, newest first (their own record only). */
+export async function loadOwnHistory(employeeId: string | null): Promise<MonthHistoryEntry[]> {
+  if (!employeeId) return [];
+  const { data, error } = await db()
+    .from("monthly_scores")
+    .select("month_key, final_score, rag, rank_in_role, overall_rank")
+    .eq("employee_id", employeeId);
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as any[])
+    .sort((a, b) => String(b.month_key).localeCompare(String(a.month_key)))
+    .map((r) => ({
+      month: monthLabel(r.month_key),
+      score: r.final_score === null ? null : Number(r.final_score),
+      rag: (r.rag ?? null) as Rag | null,
+      rankInRole: r.rank_in_role ?? null,
+      overallRank: r.overall_rank ?? null,
+    }));
+}
+
+/** Months that have any data for the viewer's own view. */
+export const monthsWithData = (data: DashboardData) =>
+  data.monthInfo.filter((m) => m.hasAttendance || m.hasScores).map((m) => m.month);
 
 /** Hand-written report-card text that exists for some past months (keyed by lowercase employee name). */
 const NARRATIVES = reportCards as Record<string, Narrative & { pdfFilename: string; pdfBase64: string }>;

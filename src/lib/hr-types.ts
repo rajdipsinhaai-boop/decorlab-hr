@@ -138,7 +138,23 @@ export type DashboardView =
       roster: RosterEntry[];
       own: Employee | null;
     }
-  | { viewerRole: "employee"; month: string; employee: Employee | null };
+  | {
+      viewerRole: "employee";
+      month: string;
+      /** Months this person has data for, newest first. */
+      months: string[];
+      employee: Employee | null;
+      /** Every month's score on record, newest first. */
+      history: MonthHistoryEntry[];
+    };
+
+export interface MonthHistoryEntry {
+  month: string;
+  score: number | null;
+  rag: Rag | null;
+  rankInRole: number | null;
+  overallRank: number | null;
+}
 
 export interface AccessUser {
   id: string;
