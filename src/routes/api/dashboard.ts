@@ -33,10 +33,13 @@ async function respond(request: Request, context: unknown): Promise<Response> {
   }
   if (role === "employee") {
     const employee = findOwn(data.employees, { employeeId, employeeName });
+    const { loadOwnHistory, monthsWithData } = await import("@/lib/hr.server");
     return Response.json({
       viewerRole: "employee",
       month: data.month,
+      months: monthsWithData(data),
       employee,
+      history: await loadOwnHistory(employee?.id ?? null),
     } satisfies DashboardView);
   }
   return Response.json({ viewerRole: "admin", data } satisfies DashboardView);

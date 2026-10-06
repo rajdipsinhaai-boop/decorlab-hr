@@ -118,6 +118,8 @@ export function dayOutcome(
 ): DayStatus {
   if (holidays.has(workDate)) return "Holiday";
   const status = deriveStatus(first, second);
+  // Someone who punched in AND out was there: fewer hours is a lower hours total, never an absence.
+  if ((status === "Absent" || status === "Unknown") && (workMin ?? 0) > 0) return "Present";
   // Our holiday calendar is the authority. If the biometric calendar calls a day a holiday that is
   // not on ours and the person punched in and worked, it was a working day.
   if (status === "Holiday" && punched) return workMin ? "Present" : "Incomplete";

@@ -79,7 +79,14 @@ export const getDashboard = createServerFn({ method: "GET" })
     if (role === "employee") {
       const employee =
         findOwn(data.employees, { employeeId, employeeName });
-      return { viewerRole: "employee", month: data.month, employee };
+      const { loadOwnHistory, monthsWithData } = await import("./hr.server");
+      return {
+        viewerRole: "employee",
+        month: data.month,
+        months: monthsWithData(data),
+        employee,
+        history: await loadOwnHistory(employee?.id ?? null),
+      };
     }
     return { viewerRole: "admin", data };
   });
@@ -543,9 +550,12 @@ export const askAssistant = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data, context }): Promise<{ answer: string }> => {
-    await assertLeadership(context as never);
-    const { answerQuestion } = await import("./assistant.server");
-    return { answer: await answerQuestion(data.question, data.history) };
+    const access = await assertAllowed(context as never);
+    const assistant = await import("./assistant.server");
+    // Administrators ask about the whole team. Everyone else gets answers about their own record only:
+    // who is asking comes from their login on the server, never from the question.
+    if (access.role === "admin") return { answer: await assistant.answerQuestion(data.question, data.history) };
+    return { answer: await assistant.answerForMember(access, data.question, data.history) };
   });
 
 export type DirectorRatingDetail = {

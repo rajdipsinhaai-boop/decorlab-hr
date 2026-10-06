@@ -5,7 +5,7 @@ import { AlertTriangle, LogOut, RefreshCw, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { DashboardView } from "@/lib/hr-types";
+import type { DashboardView, MonthHistoryEntry } from "@/lib/hr-types";
 import { initialsOf, type DashboardData, type Employee, type RosterEntry } from "@/lib/hr-types";
 import { SummaryStrip } from "@/components/dashboard/SummaryStrip";
 import { EmployeeCard } from "@/components/dashboard/EmployeeCard";
@@ -126,6 +126,22 @@ function DashboardPage() {
           </select>
         </label>
       ) : null}
+      {view?.viewerRole === "employee" && view.months.length > 1 ? (
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="sr-only">Report month</span>
+          <select
+            value={view.month}
+            onChange={(event) => setSelectedMonth(event.target.value)}
+            className="h-9 rounded-md border border-border bg-background px-3 text-xs font-medium text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+          >
+            {view.months.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       {view?.viewerRole === "admin" ? <MonthActions month={view.data.month} locked={view.data.locked} /> : null}
     </>
   );
@@ -175,7 +191,12 @@ function DashboardPage() {
             onNavChange={setActiveNav}
           />
         ) : view?.viewerRole === "employee" ? (
-          <EmployeeSelfView month={view.month} employee={view.employee} />
+          <EmployeeSelfView
+            month={view.month}
+            employee={view.employee}
+            history={view.history}
+            onPickMonth={setSelectedMonth}
+          />
         ) : view ? (
           <LeadershipView data={view.data} />
         ) : null}
@@ -323,7 +344,7 @@ function ManagerView({
         </section>
       </div>
 
-      <AskTeamChat />
+      <AskTeamChat mine />
     </div>
   );
 }
@@ -342,7 +363,17 @@ function ManagerSelfCard({ employee, month }: { employee: Employee; month: strin
   );
 }
 
-function EmployeeSelfView({ employee, month }: { employee: Employee | null; month: string }) {
+function EmployeeSelfView({
+  employee,
+  month,
+  history,
+  onPickMonth,
+}: {
+  employee: Employee | null;
+  month: string;
+  history: MonthHistoryEntry[];
+  onPickMonth: (month: string) => void;
+}) {
   const [selected, setSelected] = useState<Employee | null>(employee);
   if (!employee) {
     return (
@@ -370,6 +401,41 @@ function EmployeeSelfView({ employee, month }: { employee: Employee | null; mont
         month={month}
         onOpenChange={(open) => !open && setSelected(null)}
       />
+      {history.length ? (
+        <div className="panel max-w-2xl p-5">
+          <h3 className="text-sm font-semibold tracking-tight">My past months</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Every month on record. Open one to see its full report card.</p>
+          <table className="mt-3 w-full text-left text-xs">
+            <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="py-1.5 pr-2 font-medium">Month</th>
+                <th className="px-2 font-medium">Score</th>
+                <th className="px-2 font-medium">Rank in role</th>
+                <th className="px-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((h) => (
+                <tr key={h.month} className={`border-t border-border ${h.month === month ? "bg-primary/5" : ""}`}>
+                  <td className="py-1.5 pr-2 font-medium">{h.month}</td>
+                  <td className="px-2 tabular-nums">{h.score === null ? "Pending" : `${h.score}%`}</td>
+                  <td className="px-2 tabular-nums">{h.rankInRole ?? "—"}</td>
+                  <td className="px-2 text-right">
+                    {h.month === month ? (
+                      <span className="text-muted-foreground">Showing</span>
+                    ) : (
+                      <button type="button" onClick={() => onPickMonth(h.month)} className="text-primary underline">
+                        View
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+      <AskTeamChat mine />
     </section>
   );
 }

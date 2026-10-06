@@ -11,9 +11,12 @@ interface ChatMessage {
   content: string;
 }
 
-const SUGGESTIONS = ["Who's in the red zone?", "How is attendance looking?", "Who improved most?"];
+const TEAM_SUGGESTIONS = ["Who's in the red zone?", "How is attendance looking?", "Who improved most?"];
+const MY_SUGGESTIONS = ["Why is my score what it is?", "How was my attendance calculated?", "How did I do compared to last month?"];
 
-export function AskTeamChat() {
+/** `mine`: the signed-in person asks about their own record only (employees and managers). */
+export function AskTeamChat({ mine = false }: { mine?: boolean }) {
+  const SUGGESTIONS = mine ? MY_SUGGESTIONS : TEAM_SUGGESTIONS;
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -53,19 +56,19 @@ export function AskTeamChat() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Ask about the team"
+        aria-label={mine ? "Ask about my report" : "Ask about the team"}
         className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full border border-primary/40 bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-lg transition-transform hover:scale-105"
       >
         {open ? <X className="h-4 w-4" /> : <MessageCircle className="h-4 w-4" />}
-        <span className="hidden sm:inline">Ask about the team</span>
+        <span className="hidden sm:inline">{mine ? "Ask about my report" : "Ask about the team"}</span>
       </button>
 
       {open ? (
         <div className="panel fixed bottom-20 right-4 z-50 flex h-[70vh] max-h-[560px] w-[calc(100vw-2rem)] max-w-sm flex-col overflow-hidden p-0 shadow-2xl animate-in fade-in slide-in-from-bottom-4">
           <div className="border-b border-border px-4 py-3">
-            <p className="text-sm font-semibold">Ask about the team</p>
+            <p className="text-sm font-semibold">{mine ? "Ask about my report" : "Ask about the team"}</p>
             <p className="text-[11px] text-muted-foreground">
-              Read-only answers from the live HR sheet.
+              {mine ? "Answers about your own record only." : "Read-only answers from the live HR sheet."}
             </p>
           </div>
 
@@ -73,7 +76,9 @@ export function AskTeamChat() {
             {!messages.length ? (
               <div className="space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  Ask anything about scores, attendance or punctuality this month.
+                  {mine
+                    ? "Ask about your scores, hours or how anything was calculated. For changes or disputes, speak with HR."
+                    : "Ask anything about scores, attendance or punctuality this month."}
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {SUGGESTIONS.map((s) => (
@@ -136,7 +141,7 @@ export function AskTeamChat() {
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="How is Arunava doing this month?"
+              placeholder={mine ? "Why did my attendance score drop?" : "How is Arunava doing this month?"}
               className="h-9"
             />
             <Button type="submit" size="icon" disabled={!input.trim() || loading} aria-label="Send">

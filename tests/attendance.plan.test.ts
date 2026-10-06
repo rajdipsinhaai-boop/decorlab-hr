@@ -159,9 +159,21 @@ describe("import plan for the September 2026 report", () => {
   it("computes each person's month from the records (independently checked figures)", () => {
     const plan = planImport(report, ctx());
     const of = (id: string) => plan.stats.people.find((p) => p.cosecId === id)!.summary!;
-    expect(of("D103")).toEqual({ presentDays: 24, totalHours: 171.4, absentDays: 2, leaveDays: 0, avgHours: 7.1, punctualityDeviation: 64 });
+    expect(of("D103")).toEqual({ presentDays: 25, totalHours: 176.1, absentDays: 1, leaveDays: 0, avgHours: 7, punctualityDeviation: 54 });
     expect(of("D115")).toEqual({ presentDays: 22, totalHours: 202.8, absentDays: 3, leaveDays: 0, avgHours: 9.2, punctualityDeviation: -7 });
     expect(of("D108")).toEqual({ presentDays: 25, totalHours: 214.8, absentDays: 1, leaveDays: 0, avgHours: 8.6, punctualityDeviation: -14 });
     expect(of("D113")).toMatchObject({ presentDays: 21, leaveDays: 3, absentDays: 2 });
+  });
+});
+
+describe("in and out punches are never absent", () => {
+  it("a day with both punches and hours is Present, however short", () => {
+    for (const mins of [37, 189, 210, 480]) expect(dayOutcome("AB", "AB", mins, "2026-09-07")).toBe("Present");
+    expect(dayOutcome("AB", "AB", null, "2026-09-07")).toBe("Absent"); // no punches at all: really absent
+    expect(dayOutcome("AB", "AB", 0, "2026-09-07")).toBe("Absent");
+    expect(dayOutcome("IN", "AB", null, "2026-09-07")).toBe("Incomplete"); // only one punch: missing punch, not absent
+  });
+  it("a holiday on the calendar still wins", () => {
+    expect(dayOutcome("AB", "AB", 300, "2026-09-18", new Set(["2026-09-18"]))).toBe("Holiday");
   });
 });
