@@ -40,7 +40,7 @@ Designers: Bhavana Agarwal, Asif Ali Khan, Shibnath Mondal, Deep Das. EA: Priyan
 5. **Designers.** From Rdash design_file Tasks (`list_task_views`, filter by assignee) for the month, compute for each
    designer `coordination_pct` = % of their revision/markup tasks marked done during the month, and a one-sentence
    `coordination_basis` (e.g. "8 of 8 revision comments closed, same-day to ~3 days"). If they had no such tasks, set
-   `coordination_pct` to null and say so in `coordination_basis`. Also list `activity_days`: every date on which that
+   `coordination_pct` to null and say so in `coordination_basis`. **Client delays are not the designer's fault:** if the designer posted the update (Rdash or WhatsApp) and the client never replied or approved, do not count that task as missed or low; exclude it from the denominator and mention it in `coordination_basis` (e.g. "2 tasks excluded: client did not respond"). Also list `activity_days`: every date on which that
    designer (and the EA) did visible work in Rdash (task closed, design file uploaded or commented on, approval
    requested). Use an empty list if there was none, and omit the field if you could not check.
 8. **Summary in this session:** who has no reports, blank-template patterns, designers with 0% closure, anything alarming.

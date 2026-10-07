@@ -1,5 +1,5 @@
 import { monthKeyOf, monthKeysBetween, monthLabel } from "./attendance/normalize";
-import { summarizeMonth, TARGET_HOURS } from "./attendance/metrics";
+import { onProbation, summarizeMonth, TARGET_HOURS } from "./attendance/metrics";
 import { DEFAULT_DUTY_RULES, hhmm } from "./scoring/constants";
 import type { DutyRule } from "./scoring/types";
 import {
@@ -193,7 +193,11 @@ export function assembleDashboard(input: DashboardInput): DashboardData {
   const employees: Employee[] = [];
   for (const e of input.employees) {
     if (String(e.status).toLowerCase() === "inactive") continue;
-    const records = (daysByEmployee.get(e.id) ?? []).sort((a, b) => a.work_date.localeCompare(b.work_date));
+    // Probation has no week off and no paid leave: those days show (and count) as absent.
+    const probation = onProbation(e.join_date, plan.monthKey);
+    const records = (daysByEmployee.get(e.id) ?? [])
+      .map((r) => (probation && (r.status === "Week Off" || r.status === "Leave") ? { ...r, status: "Absent" } : r))
+      .sort((a, b) => a.work_date.localeCompare(b.work_date));
     if (monthHasData && !records.length && !scores.has(e.id)) continue;
     const metrics = summarizeMonth(
       records.map((r) => ({

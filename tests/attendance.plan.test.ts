@@ -5,7 +5,7 @@ import { resolveIdentity } from "@/lib/attendance/match";
 import { currentMonthKey, dayOutcome, deriveStatus, monthKeysBetween, monthKeyOf, monthLabel, normalizeName } from "@/lib/attendance/normalize";
 import { parseAttendanceFile } from "@/lib/attendance/parse.server";
 import { planImport } from "@/lib/attendance/plan";
-import { holidayDates, workingDaysInMonth } from "@/lib/attendance/metrics";
+import { holidayDates, onProbation, workingDaysInMonth } from "@/lib/attendance/metrics";
 import type { ParsedReport } from "@/lib/attendance/types";
 
 // The roster exactly as the migration seeds it.
@@ -67,6 +67,16 @@ describe("names and months", () => {
     expect(monthKeysBetween("2026-11", "2027-02")).toEqual(["2026-11", "2026-12", "2027-01", "2027-02"]);
     expect(currentMonthKey(new Date("2026-10-02T00:00:00Z"))).toBe("2026-10");
   });
+  it("gives probationers no week off: Sundays count, official holidays still do not", () => {
+    expect(workingDaysInMonth("2026-09", [], false)).toBe(30);
+    expect(workingDaysInMonth("2026-09", ["2026-09-18", "2026-09-06"], false)).toBe(28);
+    expect(onProbation("2026-04-01", "2026-03")).toBe(false);
+    expect(onProbation("2026-04-01", "2026-04")).toBe(true);
+    expect(onProbation("2026-04-01", "2026-10")).toBe(true);
+    expect(onProbation("2026-04-01", "2026-11")).toBe(false);
+    expect(onProbation("2026-06-01", "2026-12")).toBe(true);
+    expect(onProbation(null, "2026-10")).toBe(false);
+  });
   it("counts working days as calendar days minus Sundays", () => {
     expect(workingDaysInMonth("2026-09")).toBe(26); // 30 days, 4 Sundays
     expect(workingDaysInMonth("2026-08")).toBe(26); // 31 days, 5 Sundays
@@ -87,7 +97,7 @@ describe("full days and holidays", () => {
     expect(dayOutcome("PH", "PH", 497, "2026-09-17", new Set(), true)).toBe("Present");
     expect(dayOutcome("PH", "PH", 519, "2026-09-17", new Set(), true)).toBe("Present");
     expect(dayOutcome("PH", "PH", null, "2026-09-17", new Set(), true)).toBe("Incomplete");
-    expect(dayOutcome("PH", "PH", null, "2026-09-17")).toBe("Holiday"); // nobody came in: still a holiday
+    expect(dayOutcome("PH", "PH", null, "2026-09-17")).toBe("Absent"); // not on our calendar and no punch: absent, not a holiday
     expect(dayOutcome("PH", "PH", 519, "2026-09-17", new Set(["2026-09-17"]), true)).toBe("Holiday");
   });
   it("removes holidays (not Sundays twice) from the working days", () => {
@@ -160,7 +170,7 @@ describe("import plan for the September 2026 report", () => {
     const plan = planImport(report, ctx());
     const of = (id: string) => plan.stats.people.find((p) => p.cosecId === id)!.summary!;
     expect(of("D103")).toEqual({ presentDays: 25, totalHours: 176.1, absentDays: 1, leaveDays: 0, avgHours: 7, punctualityDeviation: 54 });
-    expect(of("D115")).toEqual({ presentDays: 22, totalHours: 202.8, absentDays: 3, leaveDays: 0, avgHours: 9.2, punctualityDeviation: -7 });
+    expect(of("D115")).toEqual({ presentDays: 22, totalHours: 202.8, absentDays: 4, leaveDays: 0, avgHours: 9.2, punctualityDeviation: -7 });
     expect(of("D108")).toEqual({ presentDays: 25, totalHours: 214.8, absentDays: 1, leaveDays: 0, avgHours: 8.6, punctualityDeviation: -14 });
     expect(of("D113")).toMatchObject({ presentDays: 21, leaveDays: 3, absentDays: 2 });
   });

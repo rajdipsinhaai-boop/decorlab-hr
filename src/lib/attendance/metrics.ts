@@ -61,17 +61,32 @@ export function summarizeMonth(days: DayRecord[], startMin: number = SCHEDULED_S
 }
 
 /**
- * Calendar days in a month minus Sundays and official holidays (YYYY-MM-DD): the denominator the
- * KRA audit uses. A holiday on a Sunday is not removed twice.
+ * Probation runs 6 months from joining. Join dates are kept to the month, so the whole of the join
+ * month and the 6 months after it count (a mid-month join is not split).
  */
-export function workingDaysInMonth(monthKey: string, holidays: Iterable<string> = []): number {
+export const PROBATION_MONTHS = 6;
+export function onProbation(joinDate: string | null | undefined, monthKey: string): boolean {
+  const j = /^(\d{4})-(\d{2})/.exec(joinDate ?? "");
+  if (!j) return false;
+  const idx = (y: string, m: string) => Number(y) * 12 + Number(m);
+  const [y, m] = monthKey.split("-") as [string, string];
+  const d = idx(y, m) - idx(j[1]!, j[2]!);
+  return d >= 0 && d <= PROBATION_MONTHS;
+}
+
+/**
+ * Calendar days in a month minus Sundays and official holidays (YYYY-MM-DD): the denominator the
+ * KRA audit uses. A holiday on a Sunday is not removed twice. Pass sundaysOff=false for someone on
+ * probation, who has no week off.
+ */
+export function workingDaysInMonth(monthKey: string, holidays: Iterable<string> = [], sundaysOff = true): number {
   const [y, m] = monthKey.split("-").map(Number) as [number, number];
   const off = new Set(holidays);
   const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
   let n = 0;
   for (let d = 1; d <= last; d++) {
     const iso = `${monthKey}-${String(d).padStart(2, "0")}`;
-    if (new Date(Date.UTC(y, m - 1, d)).getUTCDay() !== 0 && !off.has(iso)) n++;
+    if ((!sundaysOff || new Date(Date.UTC(y, m - 1, d)).getUTCDay() !== 0) && !off.has(iso)) n++;
   }
   return n;
 }
