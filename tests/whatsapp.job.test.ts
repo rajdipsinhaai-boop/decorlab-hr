@@ -104,7 +104,7 @@ describe("WhatsApp report job", () => {
     sent.length = 0;
     await expect(run()).rejects.toThrow(/failed for 1/);
     expect(sent.map((s) => s.to)).toEqual(["919051292971", "918017200790"]);
-    expect(sent[0]!.key).toBe("report-2026-09-E1");
+    expect(sent[0]!.key).toMatch(/^report-2026-09-E1-[0-9a-f]{12}$/);
     expect(status("E1")).toBe("sent");
   });
 
