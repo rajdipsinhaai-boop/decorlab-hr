@@ -81,7 +81,7 @@ export async function computeMonth(monthKey: string, opts: { force?: boolean } =
 
   const label = monthLabel(monthKey);
   const [emp, ali, params, rules, ratings, attendance, holidays] = await Promise.all([
-    db().from("employees").select("id, name, role, role_group, status").order("id"),
+    db().from("employees").select("id, name, role, role_group, status, join_date").order("id"),
     db().from("employee_aliases").select("alias_key, employee_id"),
     db().from("kra_parameters").select("*"),
     db().from("duty_rules").select("*"),

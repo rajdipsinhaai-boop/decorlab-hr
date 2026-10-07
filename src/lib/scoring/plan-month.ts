@@ -1,4 +1,4 @@
-import { holidayDates, workingDaysInMonth } from "../attendance/metrics";
+import { holidayDates, onProbation, workingDaysInMonth } from "../attendance/metrics";
 import { monthLabel } from "../attendance/normalize";
 import { rankMonth, computeScore } from "./engine";
 import { buildScoreCard } from "./score-card";
@@ -9,6 +9,7 @@ export interface MonthEmployee {
   name: string;
   role: string;
   role_group: RoleGroup;
+  join_date?: string | null;
 }
 export interface KraParam {
   role_group: RoleGroup;
@@ -93,11 +94,15 @@ export function planMonthScores(data: MonthData): {
 
   for (const e of data.employees) {
     const attendance = data.attendance.filter((a) => a.employeeId === e.id && !off.has(a.workDate));
-    // Leave taken is not held against anyone: those days leave this person's working days.
-    const leaveDays = new Set(
-      attendance.filter((a) => a.status === "Leave" && new Date(`${a.workDate}T00:00:00Z`).getUTCDay() !== 0).map((a) => a.workDate),
-    ).size;
-    const personalWorkingDays = Math.max(0, workingDays - leaveDays);
+    // Probation: no week off and no paid leave, so every day bar an official holiday is a working day.
+    const probation = onProbation(e.join_date, data.monthKey);
+    // Leave taken is not held against anyone (except on probation): those days leave this person's working days.
+    const leaveDays = probation
+      ? 0
+      : new Set(
+          attendance.filter((a) => a.status === "Leave" && new Date(`${a.workDate}T00:00:00Z`).getUTCDay() !== 0).map((a) => a.workDate),
+        ).size;
+    const personalWorkingDays = Math.max(0, (probation ? workingDaysInMonth(data.monthKey, off, false) : workingDays) - leaveDays);
     const ratings = ratingsFor(e, data.params, data.ratings);
     const audit = data.audit.get(e.id) ?? null;
     const hasRating = ratings.some((r) => r.rating !== null);
