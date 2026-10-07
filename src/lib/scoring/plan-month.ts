@@ -1,5 +1,6 @@
-import { holidayDates, onProbation, workingDaysInMonth } from "../attendance/metrics";
+import { holidayDates, onProbation, probationEnd, workingDaysInMonth } from "../attendance/metrics";
 import { monthLabel } from "../attendance/normalize";
+import { KRA_NOT_APPLICABLE } from "./constants";
 import { rankMonth, computeScore } from "./engine";
 import { buildScoreCard } from "./score-card";
 import type { AttDay, AuditPerson, DutyRule, RatingIn, RoleGroup, ScoreCardModel } from "./types";
@@ -62,9 +63,10 @@ export function ratingsFor(
   params: KraParam[],
   rows: RatingRow[],
 ): RatingIn[] {
-  const mine = new Map(rows.filter((r) => r.employee_id === e.id).map((r) => [r.kra_parameter, r]));
+  const skip = new Set(KRA_NOT_APPLICABLE[e.id] ?? []);
+  const mine = new Map(rows.filter((r) => r.employee_id === e.id && !skip.has(r.kra_parameter)).map((r) => [r.kra_parameter, r]));
   const defined = params
-    .filter((p) => p.role_group === e.role_group)
+    .filter((p) => p.role_group === e.role_group && !skip.has(p.name))
     .sort((a, b) => a.sort - b.sort)
     .map((p) => ({ name: p.name, weight: Number(p.weight), rating: mine.get(p.name)?.rating_1_to_5 ?? null }));
   const known = new Set(defined.map((d) => d.name));
@@ -118,6 +120,7 @@ export function planMonthScores(data: MonthData): {
       result,
       ratings,
       audit,
+      ...(probation && e.join_date ? { probationEnds: probationEnd(e.join_date) } : {}),
       ...(data.now ? { now: data.now } : {}),
     });
     results.push({ e, result, card, ratings, audit });

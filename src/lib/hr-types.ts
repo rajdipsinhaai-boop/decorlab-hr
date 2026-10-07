@@ -65,6 +65,8 @@ export interface Employee {
   department: string;
   manager: string;
   joinDate: string;
+  /** Last day of probation (YYYY-MM-DD) when the person is on probation in the month shown. */
+  probationEnds?: string;
   /** null until the month has been scored (attendance can be on file before scoring happens). */
   score: number | null;
   rag: Rag | null;

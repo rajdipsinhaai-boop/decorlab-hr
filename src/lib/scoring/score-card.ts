@@ -11,6 +11,7 @@ export function buildScoreCard(args: {
   result: ScoreResult;
   ratings: RatingIn[];
   audit: AuditPerson | null;
+  probationEnds?: string;
   now?: Date;
 }): ScoreCardModel {
   const { result } = args;
@@ -34,6 +35,7 @@ export function buildScoreCard(args: {
     kra: args.ratings.map((r) => ({ name: r.name, rating: r.rating })),
     why: narrative.why,
     improve: narrative.improve,
+    ...(args.probationEnds ? { probationEnds: args.probationEnds } : {}),
     generatedAt: (args.now ?? new Date()).toISOString(),
   };
 }

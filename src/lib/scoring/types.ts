@@ -113,5 +113,7 @@ export interface ScoreCardModel {
   kra: { name: string; rating: number | null }[];
   why: string[];
   improve: string[];
+  /** Last day of probation (YYYY-MM-DD), only for someone on probation in this month. */
+  probationEnds?: string;
   generatedAt: string;
 }

@@ -460,3 +460,21 @@ describe("chat coordination for designers", () => {
     expect(r.components.map((c) => c.key)).toEqual(["attendance", "coordination", "feedback"]);
   });
 });
+
+describe("KRA parameters that do not apply", () => {
+  it("drops Deep Das's two parameters and lets the other four carry the weight", async () => {
+    const { ratingsFor } = await import("@/lib/scoring/plan-month");
+    const { managerStats } = await import("@/lib/scoring/attendance-score");
+    const names = ["Design Quality & Creativity", "Client Satisfaction & Feedback", "Timeline & Deadline Adherence", "Revision Efficiency (Rework Ratio)", "Technical / Drawing Accuracy", "Site Problem-Solving Skills"];
+    const w = [0.25, 0.2, 0.2, 0.15, 0.1, 0.1];
+    const params = names.map((name, i) => ({ role_group: "designer" as const, name, weight: w[i]!, sort: i }));
+    const rate = [5, 3, 4, 5, 3, 4];
+    const rows = names.map((n, i) => ({ employee_id: "DLB-DSG-04", kra_parameter: n, weight: w[i]!, rating_1_to_5: rate[i]! }));
+    const deep = { id: "DLB-DSG-04", name: "Deep Das", role: "3D Visualizer", role_group: "designer" as const };
+    const r = ratingsFor(deep, params, rows);
+    expect(r.map((x) => x.name)).not.toContain("Technical / Drawing Accuracy");
+    expect(r).toHaveLength(4);
+    expect(managerStats(r).percent).toBe(85); // (1.25+0.6+0.8+0.75)/0.8/5
+    expect(ratingsFor({ ...deep, id: "DLB-DSG-03" }, params, rows)).toHaveLength(6);
+  });
+});

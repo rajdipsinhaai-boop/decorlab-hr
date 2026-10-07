@@ -50,6 +50,14 @@ export function bandText(rag: Rag | null): string {
   return "Not scored yet -- waiting for the inputs listed below.";
 }
 
+/**
+ * KRA parameters that do not apply to a person (their ratings are ignored, so the rest of the list
+ * carries the full weight instead of the missing ones counting as 0).
+ */
+export const KRA_NOT_APPLICABLE: Record<string, string[]> = {
+  "DLB-DSG-04": ["Technical / Drawing Accuracy", "Site Problem-Solving Skills"], // Deep Das, 3D Visualizer
+};
+
 export const ROLE_LABEL: Record<RoleGroup, string> = {
   supervisor: "Site Supervisor",
   designer: "Interior Designer",

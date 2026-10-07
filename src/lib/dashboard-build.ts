@@ -1,5 +1,5 @@
 import { monthKeyOf, monthKeysBetween, monthLabel } from "./attendance/normalize";
-import { onProbation, summarizeMonth, TARGET_HOURS } from "./attendance/metrics";
+import { onProbation, probationEnd, summarizeMonth, TARGET_HOURS } from "./attendance/metrics";
 import { DEFAULT_DUTY_RULES, hhmm } from "./scoring/constants";
 import type { DutyRule } from "./scoring/types";
 import {
@@ -236,6 +236,7 @@ export function assembleDashboard(input: DashboardInput): DashboardData {
       department: e.department ?? "",
       manager: e.manager ?? "",
       joinDate: e.join_date ?? "",
+      ...(probation && e.join_date ? { probationEnds: probationEnd(e.join_date) } : {}),
       score,
       rag,
       rankInRole: s?.rank_in_role ?? null,

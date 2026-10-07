@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage, type RGB } from "pdf-lib";
+import { fmtDay } from "../attendance/metrics";
 import type { AttendanceDay, DprActivityEntry, ScoreCardModel } from "../hr-types";
 
 // Palette taken from the July 2026 report cards.
@@ -132,6 +133,10 @@ function header(c: Ctx) {
   page.drawText(name, { x: M, y: yy(c), size: 21, font: bold, color: NAVY });
   const nameW = bold.widthOfTextAtSize(name, 21);
   page.drawText(winAnsi(`·  ${model.role}`), { x: M + nameW + 8, y: yy(c), size: 11, font, color: MUTED });
+  if (model.probationEnds) {
+    c.y += 14;
+    page.drawText(winAnsi(`ON PROBATION  -  probation ends ${fmtDay(model.probationEnds)}`), { x: M, y: yy(c), size: 9, font: bold, color: GOLD });
+  }
   c.y += 14;
   page.drawLine({ start: { x: M, y: yy(c) }, end: { x: W - M, y: yy(c) }, thickness: 1, color: rgb(0.9, 0.82, 0.55) });
   c.y += 22;
