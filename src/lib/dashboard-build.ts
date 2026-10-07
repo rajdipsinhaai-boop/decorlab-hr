@@ -1,6 +1,6 @@
 import { monthKeyOf, monthKeysBetween, monthLabel } from "./attendance/normalize";
 import { onProbation, probationEnd, summarizeMonth, TARGET_HOURS } from "./attendance/metrics";
-import { DEFAULT_DUTY_RULES, hhmm } from "./scoring/constants";
+import { DEFAULT_DUTY_RULES, hhmm, KRA_NOT_APPLICABLE } from "./scoring/constants";
 import type { DutyRule } from "./scoring/types";
 import {
   ragOf,
@@ -195,6 +195,7 @@ export function assembleDashboard(input: DashboardInput): DashboardData {
     if (String(e.status).toLowerCase() === "inactive") continue;
     // Probation has no paid leave: leave days show (and count) as absent. Sundays stay off.
     const probation = onProbation(e.join_date, plan.monthKey);
+    const skip = new Set(KRA_NOT_APPLICABLE[e.id] ?? []);
     const records = (daysByEmployee.get(e.id) ?? [])
       .map((r) => (probation && r.status === "Leave" ? { ...r, status: "Absent" } : r))
       .sort((a, b) => a.work_date.localeCompare(b.work_date));
@@ -243,7 +244,7 @@ export function assembleDashboard(input: DashboardInput): DashboardData {
       overallRank: s?.overall_rank ?? null,
       isTop3: Boolean(s?.is_top3),
       breakdown,
-      criteria: s?.criteria?.length ? s.criteria : (ratingsByEmployee.get(e.id) ?? []),
+      criteria: (s?.criteria?.length ? s.criteria : (ratingsByEmployee.get(e.id) ?? [])).filter((c) => !skip.has(c.name)),
       note: s?.note ?? "",
       presentDays: metrics.presentDays,
       totalHours: metrics.totalHours,
@@ -256,7 +257,7 @@ export function assembleDashboard(input: DashboardInput): DashboardData {
       filingDiscipline: s?.details?.filing_discipline_pct ?? null,
       dprActivity: s?.details?.dpr_days ?? [],
       taskActivity: [],
-      ...(s?.details?.card ? { card: s.details.card } : {}),
+      ...(s?.details?.card ? { card: { ...s.details.card, kra: s.details.card.kra.filter((k) => !skip.has(k.name)) } } : {}),
       ...(s?.source ? { scoreSource: s.source } : {}),
       ...(narrative
         ? {
