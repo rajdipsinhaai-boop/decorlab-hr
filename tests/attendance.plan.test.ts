@@ -67,9 +67,7 @@ describe("names and months", () => {
     expect(monthKeysBetween("2026-11", "2027-02")).toEqual(["2026-11", "2026-12", "2027-01", "2027-02"]);
     expect(currentMonthKey(new Date("2026-10-02T00:00:00Z"))).toBe("2026-10");
   });
-  it("gives probationers no week off: Sundays count, official holidays still do not", () => {
-    expect(workingDaysInMonth("2026-09", [], false)).toBe(30);
-    expect(workingDaysInMonth("2026-09", ["2026-09-18", "2026-09-06"], false)).toBe(28);
+  it("tracks the 6-month probation window", () => {
     expect(onProbation("2026-04-01", "2026-03")).toBe(false);
     expect(onProbation("2026-04-01", "2026-04")).toBe(true);
     expect(onProbation("2026-04-01", "2026-10")).toBe(true);

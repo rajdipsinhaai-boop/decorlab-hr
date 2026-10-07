@@ -193,10 +193,10 @@ export function assembleDashboard(input: DashboardInput): DashboardData {
   const employees: Employee[] = [];
   for (const e of input.employees) {
     if (String(e.status).toLowerCase() === "inactive") continue;
-    // Probation has no week off and no paid leave: those days show (and count) as absent.
+    // Probation has no paid leave: leave days show (and count) as absent. Sundays stay off.
     const probation = onProbation(e.join_date, plan.monthKey);
     const records = (daysByEmployee.get(e.id) ?? [])
-      .map((r) => (probation && (r.status === "Week Off" || r.status === "Leave") ? { ...r, status: "Absent" } : r))
+      .map((r) => (probation && r.status === "Leave" ? { ...r, status: "Absent" } : r))
       .sort((a, b) => a.work_date.localeCompare(b.work_date));
     if (monthHasData && !records.length && !scores.has(e.id)) continue;
     const metrics = summarizeMonth(
