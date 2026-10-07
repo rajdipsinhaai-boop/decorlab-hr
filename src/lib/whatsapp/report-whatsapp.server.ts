@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { monthLabel } from "../attendance/normalize";
 import { PermanentJobError, type Job } from "../jobs/queue.server";
@@ -67,16 +68,22 @@ export async function runReportWhatsApp(job: Job): Promise<Record<string, unknow
       continue;
     }
     try {
+      const components = reportComponents({
+        name: e.name,
+        month: label,
+        pdfUrl: signed.signedUrl,
+        filename: `${e.name} - ${label} Report Card.pdf`,
+      });
+      // The provider rejects a reused key whose payload differs (a regenerated report has a new signed
+      // link), so the key carries a hash of the payload: same payload retries safely, a new one is a new send.
+      const payloadHash = createHash("sha256").update(JSON.stringify(components)).digest("hex").slice(0, 12);
       const res = await sendTemplate(cfg, {
         to,
         // a test send must never use up the key of the real one
-        idempotencyKey: cfg.testTo ? `report-test-${monthKey}-${e.id}-${Date.now()}` : `report-${monthKey}-${e.id}`,
-        components: reportComponents({
-          name: e.name,
-          month: label,
-          pdfUrl: signed.signedUrl,
-          filename: `${e.name} - ${label} Report Card.pdf`,
-        }),
+        idempotencyKey: cfg.testTo
+          ? `report-test-${monthKey}-${e.id}-${Date.now()}`
+          : `report-${monthKey}-${e.id}-${payloadHash}`,
+        components,
       });
       if (res.ok) {
         // In test mode the message went to the test number, so it must not count as sent to the person.
