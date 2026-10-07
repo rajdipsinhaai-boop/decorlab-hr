@@ -94,7 +94,7 @@ export function planMonthScores(data: MonthData): {
 
   for (const e of data.employees) {
     const attendance = data.attendance.filter((a) => a.employeeId === e.id && !off.has(a.workDate));
-    // Probation: no week off and no paid leave, so every day bar an official holiday is a working day.
+    // Probation: no paid leave. Sundays and official holidays are off for everyone.
     const probation = onProbation(e.join_date, data.monthKey);
     // Leave taken is not held against anyone (except on probation): those days leave this person's working days.
     const leaveDays = probation
@@ -102,7 +102,7 @@ export function planMonthScores(data: MonthData): {
       : new Set(
           attendance.filter((a) => a.status === "Leave" && new Date(`${a.workDate}T00:00:00Z`).getUTCDay() !== 0).map((a) => a.workDate),
         ).size;
-    const personalWorkingDays = Math.max(0, (probation ? workingDaysInMonth(data.monthKey, off, false) : workingDays) - leaveDays);
+    const personalWorkingDays = Math.max(0, workingDays - leaveDays);
     const ratings = ratingsFor(e, data.params, data.ratings);
     const audit = data.audit.get(e.id) ?? null;
     const hasRating = ratings.some((r) => r.rating !== null);
