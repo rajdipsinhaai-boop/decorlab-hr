@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { KRA_NOT_APPLICABLE } from "@/lib/scoring/constants";
 import type {
   AccessUser,
   AttendanceUploadResult,
@@ -701,7 +702,7 @@ export const openRatingMonth = createServerFn({ method: "POST" })
     for (const e of emp.data ?? []) {
       if (String(e.status).toLowerCase() === "inactive") continue;
       for (const p of params.data ?? []) {
-        if (p.role_group !== e.role_group || existing.has(`${e.id}|${p.name}`)) continue;
+        if (p.role_group !== e.role_group || existing.has(`${e.id}|${p.name}`) || KRA_NOT_APPLICABLE[e.id]?.includes(p.name)) continue;
         rows.push({
           review_month: data.month,
           employee_id: e.id,

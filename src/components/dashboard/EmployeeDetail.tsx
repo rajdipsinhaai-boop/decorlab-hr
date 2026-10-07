@@ -16,6 +16,7 @@ import { ScoreRing } from "./ScoreRing";
 import { AttendanceHeatmap } from "./AttendanceHeatmap";
 import { ActivitySection } from "./ActivitySection";
 import { ScoreCardView } from "./ScoreCardView";
+import { fmtDay } from "@/lib/attendance/metrics";
 import { initialsOf, ragLabel, type Employee } from "@/lib/hr-types";
 
 const SEGMENT_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-4)"];
@@ -49,9 +50,17 @@ export function EmployeeDetail({
                   {initialsOf(employee.name)}
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-lg font-semibold">{employee.name}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="truncate text-lg font-semibold">{employee.name}</span>
+                    {employee.probationEnds ? (
+                      <span className="shrink-0 rounded border border-warning/50 bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
+                        Probation
+                      </span>
+                    ) : null}
+                  </span>
                   <span className="block text-xs font-normal text-muted-foreground">
                     {employee.role} · {month}
+                    {employee.probationEnds ? ` · Probation ends ${fmtDay(employee.probationEnds)}` : ""}
                   </span>
                 </span>
               </DialogTitle>

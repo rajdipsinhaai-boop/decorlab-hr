@@ -74,6 +74,16 @@ export function onProbation(joinDate: string | null | undefined, monthKey: strin
   return d >= 0 && d <= PROBATION_MONTHS;
 }
 
+/** Last day of the probation (YYYY-MM-DD): the end of the month that is PROBATION_MONTHS after the join month. */
+export function probationEnd(joinDate: string): string {
+  const [y, m] = joinDate.split("-").map(Number) as [number, number];
+  return new Date(Date.UTC(y, m - 1 + PROBATION_MONTHS + 1, 0)).toISOString().slice(0, 10);
+}
+
+/** "31 Oct 2026" for "2026-10-31". */
+export const fmtDay = (iso: string) =>
+  new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+
 /**
  * Calendar days in a month minus Sundays and official holidays (YYYY-MM-DD): the denominator the
  * KRA audit uses. A holiday on a Sunday is not removed twice.

@@ -1,5 +1,6 @@
 import { ChevronRight, Crown } from "lucide-react";
 import { ScoreRing } from "./ScoreRing";
+import { fmtDay } from "@/lib/attendance/metrics";
 import { initialsOf, ragLabel, type Employee } from "@/lib/hr-types";
 
 export function EmployeeCard({ employee, onOpen }: { employee: Employee; onOpen: () => void }) {
@@ -36,6 +37,14 @@ export function EmployeeCard({ employee, onOpen }: { employee: Employee; onOpen:
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <h3 className="truncate text-base font-semibold">{employee.name}</h3>
+            {employee.probationEnds ? (
+              <span
+                title={`Probation ends ${fmtDay(employee.probationEnds)}`}
+                className="shrink-0 rounded border border-warning/50 bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning"
+              >
+                Probation
+              </span>
+            ) : null}
             {employee.isTop3 ? <Crown className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
           </div>
           <p className="truncate text-xs text-muted-foreground">{employee.role}</p>

@@ -1,4 +1,5 @@
 import { Hourglass } from "lucide-react";
+import { fmtDay } from "@/lib/attendance/metrics";
 import type { ScoreCardModel } from "@/lib/hr-types";
 
 const tone = (score: number | null) =>
@@ -10,6 +11,11 @@ const fill = (score: number | null) =>
 export function ScoreCardView({ card }: { card: ScoreCardModel }) {
   return (
     <div className="space-y-5">
+      {card.probationEnds ? (
+        <p className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs font-medium text-foreground">
+          On probation. Probation ends {fmtDay(card.probationEnds)}.
+        </p>
+      ) : null}
       {card.pending.length ? (
         <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs">
           <Hourglass className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
